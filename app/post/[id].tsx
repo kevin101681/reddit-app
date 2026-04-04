@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   StyleSheet,
@@ -7,16 +7,28 @@ import {
   Image,
   Pressable,
   Linking,
-  ActivityIndicator,
 } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import Markdown from 'react-native-markdown-display';
 import { getComments, formatRelativeTime, formatScore } from '../../utils/api';
 import { RedditComment } from '../../utils/types';
 import { CommentThread } from '../../components/CommentThread';
 import { SkeletonBox } from '../../components/SkeletonLoader';
+import { buildMarkdownStyles, suppressImageRule } from '../../utils/markdownStyles';
 import { Colors, Spacing, Typography, Radius } from '../../constants/theme';
 
-// --- Comment skeleton shown while the network request is in-flight ------------
+// --- Shared link handler — opens URLs in the device browser ------------------
+
+function openLink(url: string): boolean {
+  Linking.openURL(url).catch(() => {});
+  return true; // prevent default in-app navigation
+}
+
+// --- Markdown style memos -----------------------------------------------------
+
+const postMdStyles = buildMarkdownStyles({ fontSize: Typography.sm, lineHeight: 21 });
+
+// --- Comment skeleton ---------------------------------------------------------
 
 function CommentSkeleton() {
   return (
@@ -32,7 +44,7 @@ function CommentSkeleton() {
   );
 }
 
-// --- Post header — rendered immediately from navigation params ----------------
+// --- Post header -------------------------------------------------------------
 
 interface PostHeaderProps {
   subreddit_name_prefixed: string;
@@ -69,7 +81,7 @@ function PostHeader({
 }: PostHeaderProps) {
   return (
     <View style={styles.headerWrap}>
-      {/* Subreddit + author + time */}
+      {/* Meta row */}
       <View style={styles.metaRow}>
         <Text style={styles.subreddit}>{subreddit_name_prefixed}</Text>
         <Text style={styles.dot}> · </Text>
@@ -94,10 +106,16 @@ function PostHeader({
         <Image source={{ uri: image_url }} style={styles.postImage} resizeMode="cover" />
       ) : null}
 
-      {/* Self-text */}
+      {/* Self-text rendered as Markdown */}
       {selftext ? (
         <View style={styles.selftextBox}>
-          <Text style={styles.selftext}>{selftext}</Text>
+          <Markdown
+            style={postMdStyles}
+            onLinkPress={openLink}
+            rules={suppressImageRule}
+          >
+            {selftext}
+          </Markdown>
         </View>
       ) : null}
 
@@ -171,22 +189,19 @@ export default function PostDetailScreen() {
     flair_text,
   } = params;
 
-  // Parse numeric / boolean fields forwarded as strings
-  const score       = Number(params.score ?? 0);
+  const score        = Number(params.score ?? 0);
   const num_comments = Number(params.num_comments ?? 0);
   const upvote_ratio = Number(params.upvote_ratio ?? 0);
   const created_utc  = Number(params.created_utc ?? 0);
   const over_18      = params.over_18 === '1';
 
-  // Comments are fetched separately — post header is already visible
-  const [comments, setComments] = useState<RedditComment[]>([]);
+  const [comments, setComments]           = useState<RedditComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!id || !subreddit) return;
-
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -207,8 +222,6 @@ export default function PostDetailScreen() {
     return () => abortRef.current?.abort();
   }, [id, subreddit]);
 
-  // Flat top-level comments for FlatList — replies are handled recursively
-  // inside CommentThread, so we only hand the root-level nodes to the list.
   const topLevelComments = comments.filter(
     (c) => c.depth === 0 || c.depth === undefined
   );
@@ -231,7 +244,7 @@ export default function PostDetailScreen() {
         </View>
       );
     }
-    if (!commentsLoading && topLevelComments.length === 0) {
+    if (topLevelComments.length === 0) {
       return (
         <View style={styles.noComments}>
           <Text style={styles.noCommentsText}>No comments yet.</Text>
@@ -250,7 +263,6 @@ export default function PostDetailScreen() {
         data={topLevelComments}
         keyExtractor={(item) => item.id}
         renderItem={renderComment}
-        // -- Post content rendered immediately from params, no loading wait --
         ListHeaderComponent={
           <PostHeader
             subreddit_name_prefixed={subreddit_name_prefixed ?? `r/${subreddit}`}
@@ -270,7 +282,6 @@ export default function PostDetailScreen() {
           />
         }
         ListFooterComponent={renderListFooter}
-        // Remove the default VirtualizedList-in-ScrollView nesting warning
         removeClippedSubviews
         initialNumToRender={10}
         maxToRenderPerBatch={8}
@@ -285,7 +296,6 @@ export default function PostDetailScreen() {
 const styles = StyleSheet.create({
   list: { flex: 1, backgroundColor: Colors.background },
 
-  // Post header
   headerWrap: { padding: Spacing.lg, paddingBottom: 0 },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.xs },
   subreddit: { color: Colors.primary, fontSize: Typography.sm, fontWeight: '700' },
@@ -321,7 +331,6 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     marginBottom: Spacing.md,
   },
-  selftext: { color: Colors.text, fontSize: Typography.sm, lineHeight: 20 },
   statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md },
   statChip: {
     backgroundColor: Colors.primaryMuted,
@@ -346,8 +355,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: Spacing.sm,
   },
-
-  // Individual comment rows
   commentWrap: { paddingHorizontal: Spacing.lg },
   commentDivider: {
     height: StyleSheet.hairlineWidth,
@@ -355,12 +362,8 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     marginBottom: Spacing.xs,
   },
-
-  // Comment skeleton
   skeletonWrap: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
   skeletonBlock: { marginBottom: Spacing.lg },
-
-  // States
   errorBox: {
     margin: Spacing.lg,
     backgroundColor: Colors.surface,
