@@ -1,0 +1,206 @@
+﻿import React from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  Image,
+  StyleSheet,
+} from 'react-native';
+import { router } from 'expo-router';
+import { RedditPost } from '../utils/types';
+import { formatRelativeTime, formatScore } from '../utils/api';
+import { Colors, Spacing, Typography, Radius } from '../constants/theme';
+
+interface PostCardProps {
+  post: RedditPost;
+}
+
+export function PostCard({ post }: PostCardProps) {
+  const thumbnailUrl =
+    post.preview?.images?.[0]?.resolutions?.[1]?.url?.replace(/&amp;/g, '&') ??
+    post.preview?.images?.[0]?.source?.url?.replace(/&amp;/g, '&') ??
+    null;
+
+  const isImageThumbnail =
+    thumbnailUrl &&
+    post.thumbnail !== 'self' &&
+    post.thumbnail !== 'default' &&
+    post.thumbnail !== 'nsfw';
+
+  function handlePress() {
+    router.push({
+      pathname: '/post/[id]',
+      params: {
+        id: post.id,
+        subreddit: post.subreddit,
+        title: post.title,
+      },
+    });
+  }
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      android_ripple={{ color: Colors.primaryMuted }}
+    >
+      {/* Subreddit + meta row */}
+      <View style={styles.metaRow}>
+        <Text style={styles.subreddit} numberOfLines={1}>
+          {post.subreddit_name_prefixed}
+        </Text>
+        <Text style={styles.dot}> · </Text>
+        <Text style={styles.meta}>
+          {formatRelativeTime(post.created_utc)}
+        </Text>
+        <Text style={styles.dot}> · </Text>
+        <Text style={styles.meta} numberOfLines={1}>
+          u/{post.author}
+        </Text>
+      </View>
+
+      {/* Flair */}
+      {post.flair_text ? (
+        <View style={styles.flairBadge}>
+          <Text style={styles.flairText} numberOfLines={1}>
+            {post.flair_text}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Title */}
+      <Text style={styles.title} numberOfLines={4}>
+        {post.over_18 ? '🔞 ' : ''}
+        {post.title}
+      </Text>
+
+      {/* Preview image */}
+      {isImageThumbnail ? (
+        <Image
+          source={{ uri: thumbnailUrl! }}
+          style={styles.previewImage}
+          resizeMode="cover"
+        />
+      ) : null}
+
+      {/* Actions row */}
+      <View style={styles.actionsRow}>
+        <View style={styles.pill}>
+          <Text style={styles.pillIcon}>▲</Text>
+          <Text style={styles.pillText}>{formatScore(post.score)}</Text>
+        </View>
+
+        <View style={[styles.pill, styles.pillSecondary]}>
+          <Text style={styles.pillIcon}>💬</Text>
+          <Text style={styles.pillText}>
+            {formatScore(post.num_comments)}
+          </Text>
+        </View>
+
+        {post.is_video ? (
+          <View style={[styles.pill, styles.pillTag]}>
+            <Text style={styles.pillTagText}>VIDEO</Text>
+          </View>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.surface,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+  },
+  cardPressed: {
+    opacity: 0.85,
+    backgroundColor: Colors.surfaceElevated,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginBottom: Spacing.xs,
+  },
+  subreddit: {
+    color: Colors.primary,
+    fontSize: Typography.xs,
+    fontWeight: '700',
+  },
+  dot: {
+    color: Colors.textDisabled,
+    fontSize: Typography.xs,
+  },
+  meta: {
+    color: Colors.textMuted,
+    fontSize: Typography.xs,
+    flexShrink: 1,
+  },
+  flairBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.primaryMuted,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    marginBottom: Spacing.xs,
+  },
+  flairText: {
+    color: Colors.primary,
+    fontSize: Typography.xs,
+    fontWeight: '600',
+  },
+  title: {
+    color: Colors.text,
+    fontSize: Typography.md,
+    fontWeight: '600',
+    lineHeight: 22,
+    marginBottom: Spacing.sm,
+  },
+  previewImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.sm,
+    backgroundColor: Colors.border,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryMuted,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    gap: 4,
+  },
+  pillSecondary: {
+    backgroundColor: Colors.surfaceElevated,
+  },
+  pillTag: {
+    backgroundColor: Colors.border,
+    marginLeft: 'auto',
+  },
+  pillIcon: {
+    color: Colors.primary,
+    fontSize: Typography.xs,
+  },
+  pillText: {
+    color: Colors.text,
+    fontSize: Typography.xs,
+    fontWeight: '700',
+  },
+  pillTagText: {
+    color: Colors.textMuted,
+    fontSize: Typography.xs,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+});

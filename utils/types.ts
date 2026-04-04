@@ -1,0 +1,52 @@
+﻿// Type definitions for Reddit API responses
+
+export interface RedditPost {
+  id: string;
+  title: string;
+  author: string;
+  subreddit: string;
+  subreddit_name_prefixed: string;
+  score: number;
+  num_comments: number;
+  url: string;
+  permalink: string;
+  thumbnail: string;
+  preview?: {
+    images: Array<{
+      source: { url: string; width: number; height: number };
+      resolutions: Array<{ url: string; width: number; height: number }>;
+    }>;
+  };
+  selftext: string;
+  is_video: boolean;
+  created_utc: number;
+  upvote_ratio: number;
+  stickied: boolean;
+  over_18: boolean;
+  flair_text: string | null;
+}
+
+export interface RedditComment {
+  id: string;
+  author: string;
+  body: string;
+  score: number;
+  created_utc: number;
+  depth: number;
+  replies?: RedditComment[];
+}
+
+export interface RedditListingChild<T> {
+  kind: string;
+  data: T;
+}
+
+export interface RedditListing<T> {
+  kind: string;
+  data: {
+    after: string | null;
+    before: string | null;
+    children: RedditListingChild<T>[];
+    dist: number;
+  };
+}
