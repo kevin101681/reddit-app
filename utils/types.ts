@@ -1,7 +1,8 @@
-ï»¿// Type definitions for Reddit API responses
+// Type definitions for Reddit API responses
 
 export interface RedditPost {
   id: string;
+  name: string;              // Reddit fullname, e.g. "t3_abc123" — used as pagination cursor
   title: string;
   author: string;
   subreddit: string;
@@ -36,6 +37,13 @@ export interface RedditComment {
   replies?: RedditComment[];
 }
 
+/** Flat response shape returned by the Netlify proxy */
+export interface ProxyPostsResponse {
+  posts: RedditPost[];
+  after: string | null;
+}
+
+// Legacy Reddit listing types (used by the post-detail endpoint)
 export interface RedditListingChild<T> {
   kind: string;
   data: T;

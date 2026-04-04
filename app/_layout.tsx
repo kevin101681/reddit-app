@@ -1,4 +1,4 @@
-﻿import { Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '../constants/theme';
 
@@ -17,11 +17,12 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
+          name="feed"
+          options={{ headerBackTitle: 'Back' }}
+        />
+        <Stack.Screen
           name="post/[id]"
-          options={{
-            title: 'Post',
-            headerBackTitle: 'Back',
-          }}
+          options={{ title: 'Post', headerBackTitle: 'Back' }}
         />
       </Stack>
     </>

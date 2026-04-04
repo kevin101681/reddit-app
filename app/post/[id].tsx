@@ -5,7 +5,6 @@ import {
   Text,
   View,
   Image,
-  ActivityIndicator,
   Pressable,
   Linking,
 } from 'react-native';
@@ -32,7 +31,7 @@ function CommentItem({ comment, depth = 0 }: { comment: RedditComment; depth?: n
       <View style={styles.commentMeta}>
         <Text style={styles.commentAuthor}>u/{comment.author}</Text>
         <Text style={styles.commentDot}> · </Text>
-        <Text style={styles.commentScore}>up {formatScore(comment.score)}</Text>
+        <Text style={styles.commentScore}>{formatScore(comment.score)} pts</Text>
         <Text style={styles.commentDot}> · </Text>
         <Text style={styles.commentTime}>{formatRelativeTime(comment.created_utc)}</Text>
       </View>
@@ -63,7 +62,7 @@ function PostDetailSkeleton() {
 }
 
 export default function PostDetailScreen() {
-  const { id, subreddit, title: titleParam } = useLocalSearchParams<{
+  const { id, subreddit } = useLocalSearchParams<{
     id: string;
     subreddit: string;
     title: string;
@@ -77,7 +76,6 @@ export default function PostDetailScreen() {
 
   useEffect(() => {
     if (!id || !subreddit) return;
-
     abortRef.current = new AbortController();
     (async () => {
       try {
@@ -96,7 +94,6 @@ export default function PostDetailScreen() {
         setLoading(false);
       }
     })();
-
     return () => abortRef.current?.abort();
   }, [id, subreddit]);
 
@@ -119,6 +116,8 @@ export default function PostDetailScreen() {
     <>
       <Stack.Screen options={{ title: post.subreddit_name_prefixed }} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+
+        {/* Header */}
         <View style={styles.postHeader}>
           <View style={styles.metaRow}>
             <Text style={styles.subreddit}>{post.subreddit_name_prefixed}</Text>
@@ -126,56 +125,54 @@ export default function PostDetailScreen() {
             <Text style={styles.meta}>{formatRelativeTime(post.created_utc)}</Text>
           </View>
           <Text style={styles.postTitle}>{post.title}</Text>
-          <Text style={styles.postAuthor}>Posted by u/{post.author}</Text>
+          <Text style={styles.postAuthor}>u/{post.author}</Text>
         </View>
 
+        {/* Image */}
         {imageUrl ? (
-          <Image
-            source={{ uri: imageUrl }}
-            style={styles.postImage}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: imageUrl }} style={styles.postImage} resizeMode="cover" />
         ) : null}
 
+        {/* Self text */}
         {post.selftext ? (
           <View style={styles.selftextBox}>
-            <Text style={styles.selftext} numberOfLines={20}>
-              {post.selftext}
-            </Text>
+            <Text style={styles.selftext} numberOfLines={20}>{post.selftext}</Text>
           </View>
         ) : null}
 
+        {/* Read-only stats — no vote or reply controls */}
         <View style={styles.statsRow}>
-          <View style={styles.statPill}>
-            <Text style={styles.statIcon}>up</Text>
-            <Text style={styles.statText}>{formatScore(post.score)}</Text>
+          <View style={styles.statChip}>
+            <Text style={styles.statChipText}>{formatScore(post.score)} pts</Text>
           </View>
-          <View style={[styles.statPill, styles.statPillSecondary]}>
-            <Text style={styles.statText}>{formatScore(post.num_comments)} comments</Text>
+          <View style={[styles.statChip, styles.statChipSecondary]}>
+            <Text style={styles.statChipSecondaryText}>
+              {formatScore(post.num_comments)} comments
+            </Text>
           </View>
-          <View style={[styles.statPill, styles.statPillSecondary]}>
-            <Text style={styles.statText}>{Math.round(post.upvote_ratio * 100)}% upvoted</Text>
+          <View style={[styles.statChip, styles.statChipSecondary]}>
+            <Text style={styles.statChipSecondaryText}>
+              {Math.round(post.upvote_ratio * 100)}% upvoted
+            </Text>
           </View>
           <Pressable
             onPress={() => Linking.openURL('https://reddit.com' + post.permalink)}
-            style={[styles.statPill, styles.linkPill]}
+            style={({ pressed }) => [styles.statChip, styles.linkChip, pressed && { opacity: 0.7 }]}
           >
-            <Text style={styles.linkText}>Open in Reddit</Text>
+            <Text style={styles.linkText}>Open in Reddit ?</Text>
           </Pressable>
         </View>
 
         <View style={styles.divider} />
 
+        {/* Comments — read-only, no reply inputs */}
         <Text style={styles.commentsHeader}>{comments.length} Comments</Text>
-
         {comments.length === 0 ? (
           <View style={styles.noComments}>
             <Text style={styles.noCommentsText}>No comments yet.</Text>
           </View>
         ) : (
-          comments.map((c) => (
-            <CommentItem key={c.id} comment={c} depth={0} />
-          ))
+          comments.map((c) => <CommentItem key={c.id} comment={c} depth={0} />)
         )}
       </ScrollView>
     </>
@@ -185,7 +182,10 @@ export default function PostDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
-  center: { flex: 1, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
+  center: {
+    flex: 1, backgroundColor: Colors.background,
+    alignItems: 'center', justifyContent: 'center', padding: Spacing.xl,
+  },
   errorIcon: { fontSize: 36, marginBottom: Spacing.md },
   errorTitle: { color: Colors.text, fontSize: Typography.lg, fontWeight: '700', marginBottom: Spacing.sm },
   errorMessage: { color: Colors.textMuted, fontSize: Typography.sm, textAlign: 'center' },
@@ -194,21 +194,42 @@ const styles = StyleSheet.create({
   subreddit: { color: Colors.primary, fontSize: Typography.sm, fontWeight: '700' },
   dot: { color: Colors.textDisabled, fontSize: Typography.sm },
   meta: { color: Colors.textMuted, fontSize: Typography.sm },
-  postTitle: { color: Colors.text, fontSize: Typography.xl, fontWeight: '700', lineHeight: 28, marginBottom: Spacing.xs },
+  postTitle: {
+    color: Colors.text, fontSize: Typography.xl, fontWeight: '700',
+    lineHeight: 28, marginBottom: Spacing.xs,
+  },
   postAuthor: { color: Colors.textMuted, fontSize: Typography.xs },
-  postImage: { width: '100%', height: 240, borderRadius: Radius.md, marginBottom: Spacing.md, backgroundColor: Colors.border },
-  selftextBox: { backgroundColor: Colors.surface, borderRadius: Radius.md, padding: Spacing.md, marginBottom: Spacing.md },
+  postImage: {
+    width: '100%', height: 240, borderRadius: Radius.md,
+    marginBottom: Spacing.md, backgroundColor: Colors.border,
+  },
+  selftextBox: {
+    backgroundColor: Colors.surface, borderRadius: Radius.md,
+    padding: Spacing.md, marginBottom: Spacing.md,
+  },
   selftext: { color: Colors.text, fontSize: Typography.sm, lineHeight: 20 },
-  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md },
-  statPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primaryMuted, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, gap: 4 },
-  statPillSecondary: { backgroundColor: Colors.surfaceElevated },
-  statIcon: { color: Colors.primary, fontSize: Typography.sm, fontWeight: '700' },
-  statText: { color: Colors.text, fontSize: Typography.sm, fontWeight: '700' },
-  linkPill: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  statsRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md,
+  },
+  statChip: {
+    backgroundColor: Colors.primaryMuted, borderRadius: Radius.full,
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs,
+  },
+  statChipText: { color: Colors.primary, fontSize: Typography.sm, fontWeight: '700' },
+  statChipSecondary: { backgroundColor: Colors.surfaceElevated },
+  statChipSecondaryText: { color: Colors.textMuted, fontSize: Typography.sm, fontWeight: '600' },
+  linkChip: {
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+  },
   linkText: { color: Colors.primary, fontSize: Typography.sm, fontWeight: '600' },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginVertical: Spacing.lg },
+  divider: {
+    height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginVertical: Spacing.lg,
+  },
   commentsHeader: { color: Colors.text, fontSize: Typography.md, fontWeight: '700', marginBottom: Spacing.md },
-  comment: { marginBottom: Spacing.md, paddingBottom: Spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
+  comment: {
+    marginBottom: Spacing.md, paddingBottom: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border,
+  },
   commentMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   commentAuthor: { color: Colors.primary, fontSize: Typography.xs, fontWeight: '700' },
   commentDot: { color: Colors.textDisabled, fontSize: Typography.xs },

@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   RefreshControl,
@@ -7,43 +7,48 @@ import {
   View,
   ActivityIndicator,
 } from 'react-native';
-import { getFrontpage } from '../../utils/api';
+import { getPosts } from '../../utils/api';
 import { RedditPost } from '../../utils/types';
 import { PostCard } from '../../components/PostCard';
 import { FeedSkeleton } from '../../components/SkeletonLoader';
 import { Colors, Spacing, Typography } from '../../constants/theme';
+
+const SUBREDDIT = 'popular';
+const SORT = 'hot';
 
 export default function FrontpageScreen() {
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [after, setAfter] = useState<string | null>(null);
+  const [after, setAfter] = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const fetchPosts = useCallback(async (reset = false) => {
-    if (abortRef.current) abortRef.current.abort();
+  const fetchPosts = useCallback(async (reset: boolean, cursor?: string) => {
+    abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
     try {
       setError(null);
-      const data = await getFrontpage(
-        reset ? undefined : (after ?? undefined),
-        controller.signal
-      );
-      const newPosts = data.data.children.map((c) => c.data);
-      setPosts((prev) => (reset ? newPosts : [...prev, ...newPosts]));
-      setAfter(data.data.after);
+      const data = await getPosts(SUBREDDIT, SORT, cursor, controller.signal);
+
+      setPosts((prev) => (reset ? data.posts : [...prev, ...data.posts]));
+
+      // Prefer proxy-supplied cursor; fall back to last post name
+      const nextCursor =
+        data.after ?? (data.posts.length ? data.posts[data.posts.length - 1].name : undefined);
+      setAfter(nextCursor ?? undefined);
+      setHasMore(!!nextCursor && data.posts.length > 0);
     } catch (err: any) {
       if (err?.name !== 'AbortError') {
         setError(err?.message ?? 'Failed to load posts');
       }
     }
-  }, [after]);
+  }, []);
 
-  // Initial load
   useEffect(() => {
     fetchPosts(true).finally(() => setLoading(false));
     return () => abortRef.current?.abort();
@@ -51,17 +56,18 @@ export default function FrontpageScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setAfter(null);
+    setAfter(undefined);
+    setHasMore(true);
     await fetchPosts(true);
     setRefreshing(false);
-  }, []);
+  }, [fetchPosts]);
 
   const onEndReached = useCallback(async () => {
-    if (loadingMore || !after) return;
+    if (loadingMore || !hasMore) return;
     setLoadingMore(true);
-    await fetchPosts(false);
+    await fetchPosts(false, after);
     setLoadingMore(false);
-  }, [loadingMore, after, fetchPosts]);
+  }, [loadingMore, hasMore, after, fetchPosts]);
 
   if (loading) {
     return (
@@ -74,7 +80,7 @@ export default function FrontpageScreen() {
   if (error && posts.length === 0) {
     return (
       <View style={styles.center}>
-        <Text style={styles.errorIcon}>⚠️</Text>
+        <Text style={styles.errorIcon}>??</Text>
         <Text style={styles.errorTitle}>Could not load posts</Text>
         <Text style={styles.errorMessage}>{error}</Text>
         <Text style={styles.retryHint}>Pull down to retry</Text>
@@ -99,20 +105,17 @@ export default function FrontpageScreen() {
         />
       }
       onEndReached={onEndReached}
-      onEndReachedThreshold={0.3}
+      onEndReachedThreshold={0.4}
       ListHeaderComponent={
         error ? (
           <View style={styles.errorBanner}>
-            <Text style={styles.errorBannerText}>⚠️ {error}</Text>
+            <Text style={styles.errorBannerText}>?? {error}</Text>
           </View>
         ) : null
       }
       ListFooterComponent={
         loadingMore ? (
-          <ActivityIndicator
-            color={Colors.primary}
-            style={styles.loadingMore}
-          />
+          <ActivityIndicator color={Colors.primary} style={styles.loadingMore} />
         ) : null
       }
     />
@@ -135,10 +138,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: Spacing.xl,
   },
-  errorIcon: {
-    fontSize: 40,
-    marginBottom: Spacing.md,
-  },
+  errorIcon: { fontSize: 40, marginBottom: Spacing.md },
   errorTitle: {
     color: Colors.text,
     fontSize: Typography.lg,
@@ -151,10 +151,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: Spacing.md,
   },
-  retryHint: {
-    color: Colors.textDisabled,
-    fontSize: Typography.sm,
-  },
+  retryHint: { color: Colors.textDisabled, fontSize: Typography.sm },
   errorBanner: {
     backgroundColor: Colors.surface,
     marginHorizontal: Spacing.md,
@@ -162,11 +159,6 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: 8,
   },
-  errorBannerText: {
-    color: Colors.textMuted,
-    fontSize: Typography.sm,
-  },
-  loadingMore: {
-    paddingVertical: Spacing.xl,
-  },
+  errorBannerText: { color: Colors.textMuted, fontSize: Typography.sm },
+  loadingMore: { paddingVertical: Spacing.xl },
 });

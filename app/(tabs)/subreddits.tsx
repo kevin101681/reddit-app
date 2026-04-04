@@ -1,137 +1,84 @@
-Ôªøimport React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
   View,
+  Text,
   TextInput,
   Pressable,
-  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
-import { getSubreddit, searchSubreddits } from '../../utils/api';
-import { RedditPost } from '../../utils/types';
-import { PostCard } from '../../components/PostCard';
-import { FeedSkeleton } from '../../components/SkeletonLoader';
 import { Colors, Spacing, Typography, Radius } from '../../constants/theme';
 
-const DEFAULT_SUBS = ['programming', 'technology', 'science', 'worldnews', 'gaming'];
+const FAVORITES = [
+  { name: 'reactnative',   icon: '??' },
+  { name: 'programming',   icon: '??' },
+  { name: 'technology',    icon: '??' },
+  { name: 'worldnews',     icon: '??' },
+  { name: 'science',       icon: '??' },
+  { name: 'gaming',        icon: '??' },
+  { name: 'movies',        icon: '??' },
+  { name: 'books',         icon: '??' },
+];
+
+function navigate(subreddit: string) {
+  const sub = subreddit.trim().replace(/^r\//i, '');
+  if (!sub) return;
+  router.push({ pathname: '/feed', params: { subreddit: sub } });
+}
 
 export default function SubredditsScreen() {
-  const [selectedSub, setSelectedSub] = useState(DEFAULT_SUBS[0]);
-  const [posts, setPosts] = useState<RedditPost[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [after, setAfter] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  const fetchPosts = useCallback(
-    async (sub: string, reset = false, cursor?: string) => {
-      if (abortRef.current) abortRef.current.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-      try {
-        setError(null);
-        const data = await getSubreddit(sub, reset ? undefined : cursor, controller.signal);
-        const newPosts = data.data.children.map((c) => c.data);
-        setPosts((prev) => (reset ? newPosts : [...prev, ...newPosts]));
-        setAfter(data.data.after);
-      } catch (err: any) {
-        if (err?.name !== 'AbortError') {
-          setError(err?.message ?? 'Failed to load posts');
-        }
-      }
-    },
-    []
-  );
-
-  useEffect(() => {
-    setLoading(true);
-    setAfter(null);
-    fetchPosts(selectedSub, true).finally(() => setLoading(false));
-    return () => abortRef.current?.abort();
-  }, [selectedSub]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    setAfter(null);
-    await fetchPosts(selectedSub, true);
-    setRefreshing(false);
-  }, [selectedSub]);
-
-  const onEndReached = useCallback(async () => {
-    if (loadingMore || !after) return;
-    setLoadingMore(true);
-    await fetchPosts(selectedSub, false, after);
-    setLoadingMore(false);
-  }, [loadingMore, after, selectedSub, fetchPosts]);
+  const [input, setInput] = useState('');
 
   return (
-    <View style={styles.container}>
-      {/* Subreddit chips */}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      {/* Search / custom input */}
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.input}
+          placeholder="r/subreddit nameÖ"
+          placeholderTextColor={Colors.textDisabled}
+          value={input}
+          onChangeText={setInput}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="go"
+          onSubmitEditing={() => { navigate(input); setInput(''); }}
+        />
+        <Pressable
+          style={({ pressed }) => [styles.goBtn, pressed && styles.goBtnPressed]}
+          onPress={() => { navigate(input); setInput(''); }}
+        >
+          <Text style={styles.goBtnText}>Go</Text>
+        </Pressable>
+      </View>
+
+      {/* Favorites */}
+      <Text style={styles.sectionLabel}>FAVORITES</Text>
       <FlatList
-        horizontal
-        data={DEFAULT_SUBS}
-        keyExtractor={(item) => item}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chips}
+        data={FAVORITES}
+        keyExtractor={(item) => item.name}
+        contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <Pressable
-            onPress={() => setSelectedSub(item)}
-            style={[styles.chip, selectedSub === item && styles.chipActive]}
+            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            onPress={() => navigate(item.name)}
           >
-            <Text
-              style={[
-                styles.chipText,
-                selectedSub === item && styles.chipTextActive,
-              ]}
-            >
-              r/{item}
-            </Text>
+            <Text style={styles.rowIcon}>{item.icon}</Text>
+            <View style={styles.rowText}>
+              <Text style={styles.rowName}>r/{item.name}</Text>
+            </View>
+            <Text style={styles.chevron}>õ</Text>
           </Pressable>
         )}
-        style={styles.chipRow}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
-
-      {/* Post feed */}
-      {loading ? (
-        <View style={styles.feedContainer}>
-          <FeedSkeleton />
-        </View>
-      ) : error && posts.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.errorIcon}>‚ö†Ô∏è</Text>
-          <Text style={styles.errorTitle}>Could not load r/{selectedSub}</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={posts}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <PostCard post={item} />}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={Colors.primary}
-              colors={[Colors.primary]}
-              progressBackgroundColor={Colors.surface}
-            />
-          }
-          onEndReached={onEndReached}
-          onEndReachedThreshold={0.3}
-          ListFooterComponent={
-            loadingMore ? (
-              <ActivityIndicator color={Colors.primary} style={styles.loadingMore} />
-            ) : null
-          }
-        />
-      )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -140,66 +87,81 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  chipRow: {
-    maxHeight: 52,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  chips: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    margin: Spacing.md,
     gap: Spacing.sm,
   },
-  chip: {
+  input: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    color: Colors.text,
+    fontSize: Typography.md,
+    borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.surfaceElevated,
+    paddingVertical: Spacing.sm,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  chipActive: {
+  goBtn: {
     backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
   },
-  chipText: {
+  goBtnPressed: {
+    opacity: 0.8,
+  },
+  goBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: Typography.md,
+  },
+  sectionLabel: {
     color: Colors.textMuted,
-    fontSize: Typography.sm,
+    fontSize: Typography.xs,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.xs,
+    marginTop: Spacing.sm,
+  },
+  list: {
+    marginHorizontal: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+  },
+  rowPressed: {
+    backgroundColor: Colors.surfaceElevated,
+  },
+  rowIcon: {
+    fontSize: 22,
+    marginRight: Spacing.md,
+  },
+  rowText: {
+    flex: 1,
+  },
+  rowName: {
+    color: Colors.text,
+    fontSize: Typography.md,
     fontWeight: '600',
   },
-  chipTextActive: {
-    color: '#fff',
+  chevron: {
+    color: Colors.textDisabled,
+    fontSize: Typography.xl,
+    fontWeight: '300',
   },
-  feedContainer: {
-    flex: 1,
-  },
-  listContent: {
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.xl,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.xl,
-  },
-  errorIcon: {
-    fontSize: 36,
-    marginBottom: Spacing.md,
-  },
-  errorTitle: {
-    color: Colors.text,
-    fontSize: Typography.lg,
-    fontWeight: '700',
-    marginBottom: Spacing.sm,
-  },
-  errorMessage: {
-    color: Colors.textMuted,
-    fontSize: Typography.sm,
-    textAlign: 'center',
-  },
-  loadingMore: {
-    paddingVertical: Spacing.xl,
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
+    marginLeft: Spacing.lg + 22 + Spacing.md,
   },
 });

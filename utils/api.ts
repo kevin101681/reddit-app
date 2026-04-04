@@ -1,4 +1,4 @@
-﻿import { RedditListing, RedditPost, RedditComment } from './types';
+import { ProxyPostsResponse, RedditListing, RedditPost, RedditComment } from './types';
 
 const PROXY_URL = process.env.EXPO_PUBLIC_NETLIFY_PROXY_URL;
 
@@ -19,66 +19,45 @@ function getBaseUrl(): string {
   return PROXY_URL.replace(/\/$/, '');
 }
 
-async function apiFetch<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const url = `${getBaseUrl()}${path}`;
+async function apiFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, {
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
+    headers: { Accept: 'application/json' },
     signal,
   });
-
   if (!response.ok) {
     throw new Error(`API error ${response.status}: ${response.statusText}`);
   }
-
   return response.json() as Promise<T>;
 }
 
-/** Fetch the front page (r/all or home) with optional pagination cursor */
-export async function getFrontpage(
-  after?: string,
-  signal?: AbortSignal
-): Promise<RedditListing<RedditPost>> {
-  const query = after ? `?after=${after}&limit=25` : '?limit=25';
-  return apiFetch<RedditListing<RedditPost>>(`/api/frontpage${query}`, signal);
-}
-
-/** Fetch posts from a specific subreddit */
-export async function getSubreddit(
+/**
+ * Fetch posts from the Netlify proxy.
+ * Maps to: GET {PROXY_URL}?subreddit=<sub>&sort=<sort>[&after=<cursor>]
+ * Response: { posts: RedditPost[], after: string | null }
+ */
+export async function getPosts(
   subreddit: string,
+  sort: string,
   after?: string,
   signal?: AbortSignal
-): Promise<RedditListing<RedditPost>> {
-  const query = after ? `?after=${after}&limit=25` : '?limit=25';
-  return apiFetch<RedditListing<RedditPost>>(
-    `/api/r/${subreddit}${query}`,
-    signal
-  );
+): Promise<ProxyPostsResponse> {
+  const params = new URLSearchParams({ subreddit, sort });
+  if (after) params.set('after', after);
+  const url = `${getBaseUrl()}?${params.toString()}`;
+  return apiFetch<ProxyPostsResponse>(url, signal);
 }
 
-/** Fetch post detail + top-level comments */
+/** Fetch post detail + top-level comments (still uses Reddit listing shape) */
 export async function getPostDetail(
   subreddit: string,
   postId: string,
   signal?: AbortSignal
 ): Promise<[RedditListing<RedditPost>, RedditListing<RedditComment>]> {
-  return apiFetch<[RedditListing<RedditPost>, RedditListing<RedditComment>]>(
-    `/api/r/${subreddit}/comments/${postId}`,
-    signal
-  );
+  const url = `${getBaseUrl()}/comments/${postId}?subreddit=${subreddit}`;
+  return apiFetch<[RedditListing<RedditPost>, RedditListing<RedditComment>]>(url, signal);
 }
 
-/** Search for subreddits by name */
-export async function searchSubreddits(
-  query: string,
-  signal?: AbortSignal
-): Promise<RedditListing<{ display_name: string; title: string; subscribers: number; public_description: string }>> {
-  return apiFetch(`/api/subreddits/search?q=${encodeURIComponent(query)}`, signal);
-}
-
-/** Utility: format a Unix timestamp into a relative time string */
+/** Format a Unix timestamp into a relative time string */
 export function formatRelativeTime(utc: number): string {
   const diff = Math.floor(Date.now() / 1000) - utc;
   if (diff < 60) return `${diff}s`;
@@ -88,7 +67,7 @@ export function formatRelativeTime(utc: number): string {
   return `${Math.floor(diff / 604800)}w`;
 }
 
-/** Utility: compact number formatting (1.2k, 3.4m) */
+/** Compact number formatting: 1200 ? "1.2k" */
 export function formatScore(score: number): string {
   if (score >= 1_000_000) return `${(score / 1_000_000).toFixed(1)}m`;
   if (score >= 1_000) return `${(score / 1_000).toFixed(1)}k`;
