@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -8,20 +8,11 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { getFavorites, removeFavorite } from '../../utils/storage';
 import { Colors, Spacing, Typography, Radius } from '../../constants/theme';
-
-const FAVORITES = [
-  { name: 'reactnative',   icon: '??' },
-  { name: 'programming',   icon: '??' },
-  { name: 'technology',    icon: '??' },
-  { name: 'worldnews',     icon: '??' },
-  { name: 'science',       icon: '??' },
-  { name: 'gaming',        icon: '??' },
-  { name: 'movies',        icon: '??' },
-  { name: 'books',         icon: '??' },
-];
 
 function navigate(subreddit: string) {
   const sub = subreddit.trim().replace(/^r\//i, '');
@@ -31,13 +22,42 @@ function navigate(subreddit: string) {
 
 export default function SubredditsScreen() {
   const [input, setInput] = useState('');
+  const [favorites, setFavorites] = useState<string[]>([]);
+
+  // Reload from storage every time this tab comes into focus so changes
+  // made on the feed screen (star toggle) are reflected immediately.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getFavorites().then((favs) => { if (active) setFavorites(favs); });
+      return () => { active = false; };
+    }, [])
+  );
+
+  async function handleDelete(subreddit: string) {
+    Alert.alert(
+      'Remove Favourite',
+      `Remove r/${subreddit} from your favourites?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            await removeFavorite(subreddit);
+            setFavorites((prev) => prev.filter((s) => s !== subreddit));
+          },
+        },
+      ]
+    );
+  }
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Search / custom input */}
+      {/* Custom subreddit search */}
       <View style={styles.searchRow}>
         <TextInput
           style={styles.input}
@@ -58,26 +78,48 @@ export default function SubredditsScreen() {
         </Pressable>
       </View>
 
-      {/* Favorites */}
-      <Text style={styles.sectionLabel}>FAVORITES</Text>
-      <FlatList
-        data={FAVORITES}
-        keyExtractor={(item) => item.name}
-        contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <Pressable
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-            onPress={() => navigate(item.name)}
-          >
-            <Text style={styles.rowIcon}>{item.icon}</Text>
-            <View style={styles.rowText}>
-              <Text style={styles.rowName}>r/{item.name}</Text>
+      {/* Persisted favourites */}
+      <Text style={styles.sectionLabel}>
+        {favorites.length === 0 ? 'NO FAVOURITES YET' : 'FAVOURITES'}
+      </Text>
+
+      {favorites.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStar}>{'\u2606'}</Text>
+          <Text style={styles.emptyTitle}>No saved subreddits</Text>
+          <Text style={styles.emptyHint}>
+            Browse any subreddit and tap the {'\u2605'} star in the header to save it here.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={favorites}
+          keyExtractor={(item) => item}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <View style={styles.row}>
+              {/* Navigate on tap */}
+              <Pressable
+                style={({ pressed }) => [styles.rowMain, pressed && styles.rowMainPressed]}
+                onPress={() => navigate(item)}
+              >
+                <Text style={styles.rowName}>r/{item}</Text>
+                <Text style={styles.chevron}>{'\u203a'}</Text>
+              </Pressable>
+
+              {/* Delete button */}
+              <Pressable
+                style={({ pressed }) => [styles.deleteBtn, pressed && styles.deleteBtnPressed]}
+                onPress={() => handleDelete(item)}
+                hitSlop={8}
+              >
+                <Text style={styles.deleteIcon}>{'\u{1F5D1}'}</Text>
+              </Pressable>
             </View>
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>
-        )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-      />
+          )}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -110,14 +152,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
   },
-  goBtnPressed: {
-    opacity: 0.8,
-  },
-  goBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: Typography.md,
-  },
+  goBtnPressed: { opacity: 0.8 },
+  goBtnText: { color: '#fff', fontWeight: '700', fontSize: Typography.md },
   sectionLabel: {
     color: Colors.textMuted,
     fontSize: Typography.xs,
@@ -126,6 +162,30 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.xs,
     marginTop: Spacing.sm,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.xxl,
+    paddingBottom: 60,
+  },
+  emptyStar: {
+    fontSize: 52,
+    color: Colors.textDisabled,
+    marginBottom: Spacing.md,
+  },
+  emptyTitle: {
+    color: Colors.text,
+    fontSize: Typography.lg,
+    fontWeight: '700',
+    marginBottom: Spacing.sm,
+  },
+  emptyHint: {
+    color: Colors.textMuted,
+    fontSize: Typography.sm,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   list: {
     marginHorizontal: Spacing.md,
@@ -136,20 +196,20 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: Colors.surface,
+  },
+  rowMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
   },
-  rowPressed: {
+  rowMainPressed: {
     backgroundColor: Colors.surfaceElevated,
   },
-  rowIcon: {
-    fontSize: 22,
-    marginRight: Spacing.md,
-  },
-  rowText: {
-    flex: 1,
-  },
   rowName: {
+    flex: 1,
     color: Colors.text,
     fontSize: Typography.md,
     fontWeight: '600',
@@ -158,10 +218,19 @@ const styles = StyleSheet.create({
     color: Colors.textDisabled,
     fontSize: Typography.xl,
     fontWeight: '300',
+    marginRight: Spacing.sm,
+  },
+  deleteBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+  },
+  deleteBtnPressed: { opacity: 0.4 },
+  deleteIcon: {
+    fontSize: 18,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: Colors.border,
-    marginLeft: Spacing.lg + 22 + Spacing.md,
+    marginLeft: Spacing.lg,
   },
 });
