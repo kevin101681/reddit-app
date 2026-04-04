@@ -1,241 +1,373 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ScrollView,
+  FlatList,
   StyleSheet,
   Text,
   View,
   Image,
   Pressable,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { getPostDetail, formatRelativeTime, formatScore } from '../../utils/api';
-import { RedditPost, RedditComment } from '../../utils/types';
+import { getComments, formatRelativeTime, formatScore } from '../../utils/api';
+import { RedditComment } from '../../utils/types';
+import { CommentThread } from '../../components/CommentThread';
 import { SkeletonBox } from '../../components/SkeletonLoader';
 import { Colors, Spacing, Typography, Radius } from '../../constants/theme';
 
-function CommentItem({ comment, depth = 0 }: { comment: RedditComment; depth?: number }) {
-  if (!comment.body || comment.body === '[deleted]') return null;
+// --- Comment skeleton shown while the network request is in-flight ------------
+
+function CommentSkeleton() {
   return (
-    <View
-      style={[
-        styles.comment,
-        depth > 0 && {
-          marginLeft: depth * Spacing.lg,
-          borderLeftWidth: 2,
-          borderLeftColor: depth % 2 === 0 ? Colors.primary : Colors.border,
-          paddingLeft: Spacing.sm,
-        },
-      ]}
-    >
-      <View style={styles.commentMeta}>
-        <Text style={styles.commentAuthor}>u/{comment.author}</Text>
-        <Text style={styles.commentDot}> · </Text>
-        <Text style={styles.commentScore}>{formatScore(comment.score)} pts</Text>
-        <Text style={styles.commentDot}> · </Text>
-        <Text style={styles.commentTime}>{formatRelativeTime(comment.created_utc)}</Text>
-      </View>
-      <Text style={styles.commentBody}>{comment.body}</Text>
-      {comment.replies?.map((reply) => (
-        <CommentItem key={reply.id} comment={reply} depth={depth + 1} />
+    <View style={styles.skeletonWrap}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <View key={i} style={[styles.skeletonBlock, { marginLeft: (i % 3) * Spacing.lg }]}>
+          <SkeletonBox width={100 + (i % 2) * 40} height={11} />
+          <SkeletonBox width="90%" height={14} style={{ marginTop: Spacing.xs }} />
+          <SkeletonBox width="70%" height={14} style={{ marginTop: 4 }} />
+        </View>
       ))}
     </View>
   );
 }
 
-function PostDetailSkeleton() {
+// --- Post header — rendered immediately from navigation params ----------------
+
+interface PostHeaderProps {
+  subreddit_name_prefixed: string;
+  title: string;
+  author: string;
+  score: number;
+  num_comments: number;
+  upvote_ratio: number;
+  created_utc: number;
+  permalink: string;
+  selftext: string;
+  image_url: string;
+  flair_text: string;
+  over_18: boolean;
+  commentCount: number;
+  commentsLoading: boolean;
+}
+
+function PostHeader({
+  subreddit_name_prefixed,
+  title,
+  author,
+  score,
+  num_comments,
+  upvote_ratio,
+  created_utc,
+  permalink,
+  selftext,
+  image_url,
+  flair_text,
+  over_18,
+  commentCount,
+  commentsLoading,
+}: PostHeaderProps) {
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <SkeletonBox width="80%" height={20} />
-      <SkeletonBox width="50%" height={14} style={{ marginTop: Spacing.sm }} />
-      <SkeletonBox width="100%" height={220} borderRadius={Radius.md} style={{ marginTop: Spacing.md }} />
-      <SkeletonBox width="100%" height={1} style={{ marginVertical: Spacing.lg }} />
-      {Array.from({ length: 4 }).map((_, i) => (
-        <View key={i} style={{ marginBottom: Spacing.lg }}>
-          <SkeletonBox width={120} height={12} />
-          <SkeletonBox width="90%" height={14} style={{ marginTop: Spacing.xs }} />
-          <SkeletonBox width="70%" height={14} style={{ marginTop: 4 }} />
+    <View style={styles.headerWrap}>
+      {/* Subreddit + author + time */}
+      <View style={styles.metaRow}>
+        <Text style={styles.subreddit}>{subreddit_name_prefixed}</Text>
+        <Text style={styles.dot}> · </Text>
+        <Text style={styles.meta}>{formatRelativeTime(created_utc)}</Text>
+      </View>
+
+      {/* Flair */}
+      {flair_text ? (
+        <View style={styles.flairBadge}>
+          <Text style={styles.flairText} numberOfLines={1}>{flair_text}</Text>
         </View>
-      ))}
-    </ScrollView>
+      ) : null}
+
+      {/* Title */}
+      <Text style={styles.postTitle}>
+        {over_18 ? '?? ' : ''}{title}
+      </Text>
+      <Text style={styles.postAuthor}>u/{author}</Text>
+
+      {/* Hero image */}
+      {image_url ? (
+        <Image source={{ uri: image_url }} style={styles.postImage} resizeMode="cover" />
+      ) : null}
+
+      {/* Self-text */}
+      {selftext ? (
+        <View style={styles.selftextBox}>
+          <Text style={styles.selftext}>{selftext}</Text>
+        </View>
+      ) : null}
+
+      {/* Read-only stats chips */}
+      <View style={styles.statsRow}>
+        <View style={styles.statChip}>
+          <Text style={styles.statChipText}>{formatScore(score)} pts</Text>
+        </View>
+        <View style={[styles.statChip, styles.statChipSecondary]}>
+          <Text style={styles.statChipSecondaryText}>
+            {formatScore(num_comments)} comments
+          </Text>
+        </View>
+        <View style={[styles.statChip, styles.statChipSecondary]}>
+          <Text style={styles.statChipSecondaryText}>
+            {Math.round(upvote_ratio * 100)}% upvoted
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => Linking.openURL('https://reddit.com' + permalink)}
+          style={({ pressed }) => [
+            styles.statChip,
+            styles.linkChip,
+            pressed && { opacity: 0.6 },
+          ]}
+        >
+          <Text style={styles.linkText}>Open in Reddit ?</Text>
+        </Pressable>
+      </View>
+
+      {/* Divider + comments heading */}
+      <View style={styles.divider} />
+      <Text style={styles.commentsHeader}>
+        {commentsLoading
+          ? 'Loading comments…'
+          : `${commentCount} Comment${commentCount !== 1 ? 's' : ''}`}
+      </Text>
+    </View>
   );
 }
 
+// --- Main screen --------------------------------------------------------------
+
 export default function PostDetailScreen() {
-  const { id, subreddit } = useLocalSearchParams<{
+  const params = useLocalSearchParams<{
     id: string;
     subreddit: string;
+    subreddit_name_prefixed: string;
     title: string;
+    author: string;
+    score: string;
+    num_comments: string;
+    upvote_ratio: string;
+    permalink: string;
+    selftext: string;
+    created_utc: string;
+    image_url: string;
+    flair_text: string;
+    over_18: string;
   }>();
 
-  const [post, setPost] = useState<RedditPost | null>(null);
+  const {
+    id,
+    subreddit,
+    subreddit_name_prefixed,
+    title,
+    author,
+    permalink,
+    selftext,
+    image_url,
+    flair_text,
+  } = params;
+
+  // Parse numeric / boolean fields forwarded as strings
+  const score       = Number(params.score ?? 0);
+  const num_comments = Number(params.num_comments ?? 0);
+  const upvote_ratio = Number(params.upvote_ratio ?? 0);
+  const created_utc  = Number(params.created_utc ?? 0);
+  const over_18      = params.over_18 === '1';
+
+  // Comments are fetched separately — post header is already visible
   const [comments, setComments] = useState<RedditComment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [commentsLoading, setCommentsLoading] = useState(true);
+  const [commentsError, setCommentsError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!id || !subreddit) return;
-    abortRef.current = new AbortController();
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     (async () => {
       try {
-        const [postListing, commentListing] = await getPostDetail(
-          subreddit,
-          id,
-          abortRef.current!.signal
-        );
-        setPost(postListing.data.children[0]?.data ?? null);
-        setComments(commentListing.data.children.map((c) => c.data));
+        const data = await getComments(subreddit, id, controller.signal);
+        setComments(data.comments);
       } catch (err: any) {
         if (err?.name !== 'AbortError') {
-          setError(err?.message ?? 'Failed to load post');
+          setCommentsError(err?.message ?? 'Failed to load comments');
         }
       } finally {
-        setLoading(false);
+        setCommentsLoading(false);
       }
     })();
+
     return () => abortRef.current?.abort();
   }, [id, subreddit]);
 
-  if (loading) return <PostDetailSkeleton />;
+  // Flat top-level comments for FlatList — replies are handled recursively
+  // inside CommentThread, so we only hand the root-level nodes to the list.
+  const topLevelComments = comments.filter(
+    (c) => c.depth === 0 || c.depth === undefined
+  );
 
-  if (error || !post) {
+  function renderComment({ item }: { item: RedditComment }) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorIcon}>??</Text>
-        <Text style={styles.errorTitle}>Could not load post</Text>
-        <Text style={styles.errorMessage}>{error ?? 'Post not found'}</Text>
+      <View style={styles.commentWrap}>
+        <CommentThread comment={item} depth={0} />
+        <View style={styles.commentDivider} />
       </View>
     );
   }
 
-  const imageUrl =
-    post.preview?.images?.[0]?.source?.url?.replace(/&amp;/g, '&') ?? null;
+  function renderListFooter() {
+    if (commentsLoading) return <CommentSkeleton />;
+    if (commentsError) {
+      return (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>?? {commentsError}</Text>
+        </View>
+      );
+    }
+    if (!commentsLoading && topLevelComments.length === 0) {
+      return (
+        <View style={styles.noComments}>
+          <Text style={styles.noCommentsText}>No comments yet.</Text>
+        </View>
+      );
+    }
+    return <View style={{ height: Spacing.xxl }} />;
+  }
 
   return (
     <>
-      <Stack.Screen options={{ title: post.subreddit_name_prefixed }} />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Stack.Screen options={{ title: subreddit_name_prefixed ?? `r/${subreddit}` }} />
 
-        {/* Header */}
-        <View style={styles.postHeader}>
-          <View style={styles.metaRow}>
-            <Text style={styles.subreddit}>{post.subreddit_name_prefixed}</Text>
-            <Text style={styles.dot}> · </Text>
-            <Text style={styles.meta}>{formatRelativeTime(post.created_utc)}</Text>
-          </View>
-          <Text style={styles.postTitle}>{post.title}</Text>
-          <Text style={styles.postAuthor}>u/{post.author}</Text>
-        </View>
-
-        {/* Image */}
-        {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.postImage} resizeMode="cover" />
-        ) : null}
-
-        {/* Self text */}
-        {post.selftext ? (
-          <View style={styles.selftextBox}>
-            <Text style={styles.selftext} numberOfLines={20}>{post.selftext}</Text>
-          </View>
-        ) : null}
-
-        {/* Read-only stats — no vote or reply controls */}
-        <View style={styles.statsRow}>
-          <View style={styles.statChip}>
-            <Text style={styles.statChipText}>{formatScore(post.score)} pts</Text>
-          </View>
-          <View style={[styles.statChip, styles.statChipSecondary]}>
-            <Text style={styles.statChipSecondaryText}>
-              {formatScore(post.num_comments)} comments
-            </Text>
-          </View>
-          <View style={[styles.statChip, styles.statChipSecondary]}>
-            <Text style={styles.statChipSecondaryText}>
-              {Math.round(post.upvote_ratio * 100)}% upvoted
-            </Text>
-          </View>
-          <Pressable
-            onPress={() => Linking.openURL('https://reddit.com' + post.permalink)}
-            style={({ pressed }) => [styles.statChip, styles.linkChip, pressed && { opacity: 0.7 }]}
-          >
-            <Text style={styles.linkText}>Open in Reddit ?</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.divider} />
-
-        {/* Comments — read-only, no reply inputs */}
-        <Text style={styles.commentsHeader}>{comments.length} Comments</Text>
-        {comments.length === 0 ? (
-          <View style={styles.noComments}>
-            <Text style={styles.noCommentsText}>No comments yet.</Text>
-          </View>
-        ) : (
-          comments.map((c) => <CommentItem key={c.id} comment={c} depth={0} />)
-        )}
-      </ScrollView>
+      <FlatList
+        style={styles.list}
+        data={topLevelComments}
+        keyExtractor={(item) => item.id}
+        renderItem={renderComment}
+        // -- Post content rendered immediately from params, no loading wait --
+        ListHeaderComponent={
+          <PostHeader
+            subreddit_name_prefixed={subreddit_name_prefixed ?? `r/${subreddit}`}
+            title={title ?? ''}
+            author={author ?? ''}
+            score={score}
+            num_comments={num_comments}
+            upvote_ratio={upvote_ratio}
+            created_utc={created_utc}
+            permalink={permalink ?? ''}
+            selftext={selftext ?? ''}
+            image_url={image_url ?? ''}
+            flair_text={flair_text ?? ''}
+            over_18={over_18}
+            commentCount={topLevelComments.length}
+            commentsLoading={commentsLoading}
+          />
+        }
+        ListFooterComponent={renderListFooter}
+        // Remove the default VirtualizedList-in-ScrollView nesting warning
+        removeClippedSubviews
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+      />
     </>
   );
 }
 
+// --- Styles -------------------------------------------------------------------
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
-  center: {
-    flex: 1, backgroundColor: Colors.background,
-    alignItems: 'center', justifyContent: 'center', padding: Spacing.xl,
-  },
-  errorIcon: { fontSize: 36, marginBottom: Spacing.md },
-  errorTitle: { color: Colors.text, fontSize: Typography.lg, fontWeight: '700', marginBottom: Spacing.sm },
-  errorMessage: { color: Colors.textMuted, fontSize: Typography.sm, textAlign: 'center' },
-  postHeader: { marginBottom: Spacing.md },
+  list: { flex: 1, backgroundColor: Colors.background },
+
+  // Post header
+  headerWrap: { padding: Spacing.lg, paddingBottom: 0 },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.xs },
   subreddit: { color: Colors.primary, fontSize: Typography.sm, fontWeight: '700' },
   dot: { color: Colors.textDisabled, fontSize: Typography.sm },
   meta: { color: Colors.textMuted, fontSize: Typography.sm },
-  postTitle: {
-    color: Colors.text, fontSize: Typography.xl, fontWeight: '700',
-    lineHeight: 28, marginBottom: Spacing.xs,
+  flairBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.primaryMuted,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    marginBottom: Spacing.xs,
   },
-  postAuthor: { color: Colors.textMuted, fontSize: Typography.xs },
+  flairText: { color: Colors.primary, fontSize: Typography.xs, fontWeight: '600' },
+  postTitle: {
+    color: Colors.text,
+    fontSize: Typography.xl,
+    fontWeight: '700',
+    lineHeight: 28,
+    marginBottom: Spacing.xs,
+  },
+  postAuthor: { color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.md },
   postImage: {
-    width: '100%', height: 240, borderRadius: Radius.md,
-    marginBottom: Spacing.md, backgroundColor: Colors.border,
+    width: '100%',
+    height: 240,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.md,
+    backgroundColor: Colors.border,
   },
   selftextBox: {
-    backgroundColor: Colors.surface, borderRadius: Radius.md,
-    padding: Spacing.md, marginBottom: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
   },
   selftext: { color: Colors.text, fontSize: Typography.sm, lineHeight: 20 },
-  statsRow: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md,
-  },
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md },
   statChip: {
-    backgroundColor: Colors.primaryMuted, borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs,
+    backgroundColor: Colors.primaryMuted,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
   },
   statChipText: { color: Colors.primary, fontSize: Typography.sm, fontWeight: '700' },
   statChipSecondary: { backgroundColor: Colors.surfaceElevated },
   statChipSecondaryText: { color: Colors.textMuted, fontSize: Typography.sm, fontWeight: '600' },
-  linkChip: {
-    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
-  },
+  linkChip: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   linkText: { color: Colors.primary, fontSize: Typography.sm, fontWeight: '600' },
   divider: {
-    height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginVertical: Spacing.lg,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.md,
   },
-  commentsHeader: { color: Colors.text, fontSize: Typography.md, fontWeight: '700', marginBottom: Spacing.md },
-  comment: {
-    marginBottom: Spacing.md, paddingBottom: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border,
+  commentsHeader: {
+    color: Colors.text,
+    fontSize: Typography.md,
+    fontWeight: '700',
+    marginBottom: Spacing.sm,
   },
-  commentMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  commentAuthor: { color: Colors.primary, fontSize: Typography.xs, fontWeight: '700' },
-  commentDot: { color: Colors.textDisabled, fontSize: Typography.xs },
-  commentScore: { color: Colors.textMuted, fontSize: Typography.xs },
-  commentTime: { color: Colors.textMuted, fontSize: Typography.xs },
-  commentBody: { color: Colors.text, fontSize: Typography.sm, lineHeight: 20 },
-  noComments: { alignItems: 'center', padding: Spacing.xl },
+
+  // Individual comment rows
+  commentWrap: { paddingHorizontal: Spacing.lg },
+  commentDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+  },
+
+  // Comment skeleton
+  skeletonWrap: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
+  skeletonBlock: { marginBottom: Spacing.lg },
+
+  // States
+  errorBox: {
+    margin: Spacing.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+  },
+  errorText: { color: Colors.textMuted, fontSize: Typography.sm },
+  noComments: { alignItems: 'center', padding: Spacing.xxl },
   noCommentsText: { color: Colors.textMuted, fontSize: Typography.sm },
 });

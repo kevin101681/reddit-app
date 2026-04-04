@@ -1,22 +1,16 @@
-import { ProxyPostsResponse, RedditListing, RedditPost, RedditComment } from './types';
+import { ProxyPostsResponse, ProxyCommentsResponse } from './types';
 
 const PROXY_URL = process.env.EXPO_PUBLIC_NETLIFY_PROXY_URL;
+const COMMENTS_URL = process.env.EXPO_PUBLIC_NETLIFY_PROXY_URL_COMMENTS;
 
-if (!PROXY_URL && __DEV__) {
-  console.warn(
-    '[api] EXPO_PUBLIC_NETLIFY_PROXY_URL is not set. ' +
-    'Copy .env.example to .env.local and fill in your Netlify proxy URL.'
-  );
+if (__DEV__) {
+  if (!PROXY_URL) console.warn('[api] EXPO_PUBLIC_NETLIFY_PROXY_URL is not set.');
+  if (!COMMENTS_URL) console.warn('[api] EXPO_PUBLIC_NETLIFY_PROXY_URL_COMMENTS is not set.');
 }
 
-function getBaseUrl(): string {
-  if (!PROXY_URL) {
-    throw new Error(
-      'EXPO_PUBLIC_NETLIFY_PROXY_URL is not configured. ' +
-      'Set it in your .env.local file.'
-    );
-  }
-  return PROXY_URL.replace(/\/$/, '');
+function requireEnv(value: string | undefined, name: string): string {
+  if (!value) throw new Error(`${name} is not configured. Set it in your .env.local file.`);
+  return value.replace(/\/$/, '');
 }
 
 async function apiFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
@@ -31,8 +25,8 @@ async function apiFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
 }
 
 /**
- * Fetch posts from the Netlify proxy.
- * Maps to: GET {PROXY_URL}?subreddit=<sub>&sort=<sort>[&after=<cursor>]
+ * Fetch a page of posts.
+ * GET {PROXY_URL}?subreddit=<sub>&sort=<sort>[&after=<cursor>]
  * Response: { posts: RedditPost[], after: string | null }
  */
 export async function getPosts(
@@ -41,20 +35,25 @@ export async function getPosts(
   after?: string,
   signal?: AbortSignal
 ): Promise<ProxyPostsResponse> {
+  const base = requireEnv(PROXY_URL, 'EXPO_PUBLIC_NETLIFY_PROXY_URL');
   const params = new URLSearchParams({ subreddit, sort });
   if (after) params.set('after', after);
-  const url = `${getBaseUrl()}?${params.toString()}`;
-  return apiFetch<ProxyPostsResponse>(url, signal);
+  return apiFetch<ProxyPostsResponse>(`${base}?${params.toString()}`, signal);
 }
 
-/** Fetch post detail + top-level comments (still uses Reddit listing shape) */
-export async function getPostDetail(
+/**
+ * Fetch the comment tree for a post.
+ * GET {COMMENTS_URL}?subreddit=<sub>&id=<postId>
+ * Response: { comments: RedditComment[] }
+ */
+export async function getComments(
   subreddit: string,
   postId: string,
   signal?: AbortSignal
-): Promise<[RedditListing<RedditPost>, RedditListing<RedditComment>]> {
-  const url = `${getBaseUrl()}/comments/${postId}?subreddit=${subreddit}`;
-  return apiFetch<[RedditListing<RedditPost>, RedditListing<RedditComment>]>(url, signal);
+): Promise<ProxyCommentsResponse> {
+  const base = requireEnv(COMMENTS_URL, 'EXPO_PUBLIC_NETLIFY_PROXY_URL_COMMENTS');
+  const params = new URLSearchParams({ subreddit, id: postId });
+  return apiFetch<ProxyCommentsResponse>(`${base}?${params.toString()}`, signal);
 }
 
 /** Format a Unix timestamp into a relative time string */

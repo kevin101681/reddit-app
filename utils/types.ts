@@ -37,13 +37,18 @@ export interface RedditComment {
   replies?: RedditComment[];
 }
 
-/** Flat response shape returned by the Netlify proxy */
+/** Flat posts response from the Netlify proxy */
 export interface ProxyPostsResponse {
   posts: RedditPost[];
   after: string | null;
 }
 
-// Legacy Reddit listing types (used by the post-detail endpoint)
+/** Flat comments response from the Netlify comments proxy */
+export interface ProxyCommentsResponse {
+  comments: RedditComment[];
+}
+
+// Reddit listing types (retained for any endpoints that still return them)
 export interface RedditListingChild<T> {
   kind: string;
   data: T;
