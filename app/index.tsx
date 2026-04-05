@@ -2,10 +2,9 @@
 import {
   Animated,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -348,37 +347,39 @@ export default function FrontpageScreen() {
         </Pressable>
       </Animated.View>
 
-      {/* Subreddit panel — absolute-positioned, anchored flush to bottom */}
+      {/* Subreddit panel — absolute-positioned, flush to screen bottom */}
       {isMenuOpen && (
         <>
-          {/* Scrim — tap outside the sheet to dismiss */}
+          {/* Scrim — tap outside to dismiss */}
           <Pressable
             style={styles.sheetScrim}
             onPress={() => setIsMenuOpen(false)}
           />
 
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.sheetWrapper}
-          >
-            <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
-              {/* Drag handle */}
-              <View style={styles.sheetHandle} />
+          <View style={styles.sheetWrapper}>
+            {/* Drag handle */}
+            <View style={styles.sheetHandle} />
 
-              {/* Header */}
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Subreddits</Text>
-                <Pressable
-                  style={({ pressed }) => [styles.sheetClose, pressed && styles.sheetClosePressed]}
-                  onPress={() => setIsMenuOpen(false)}
-                  hitSlop={8}
-                  accessibilityLabel="Close menu"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.sheetCloseText}>✕</Text>
-                </Pressable>
-              </View>
+            {/* Header (outside ScrollView so it stays fixed at top of panel) */}
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Subreddits</Text>
+              <Pressable
+                style={({ pressed }) => [styles.sheetClose, pressed && styles.sheetClosePressed]}
+                onPress={() => setIsMenuOpen(false)}
+                hitSlop={8}
+                accessibilityLabel="Close menu"
+                accessibilityRole="button"
+              >
+                <Text style={styles.sheetCloseText}>✕</Text>
+              </Pressable>
+            </View>
 
+            {/* Single ScrollView — search bar + favourites scroll together */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+            >
               {/* Search row */}
               <View style={styles.sheetSearchRow}>
                 <TextInput
@@ -400,7 +401,7 @@ export default function FrontpageScreen() {
                 </Pressable>
               </View>
 
-              {/* Favourites list */}
+              {/* Favourites */}
               <Text style={styles.sheetSectionLabel}>
                 {favorites.length === 0 ? 'NO FAVOURITES YET' : 'FAVOURITES'}
               </Text>
@@ -414,34 +415,34 @@ export default function FrontpageScreen() {
                   </Text>
                 </View>
               ) : (
-                <FlatList
-                  data={favorites}
-                  keyExtractor={(item) => item}
-                  style={styles.sheetList}
-                  contentContainerStyle={styles.sheetListContent}
-                  renderItem={({ item }) => (
-                    <View style={styles.sheetRow}>
-                      <Pressable
-                        style={({ pressed }) => [styles.sheetRowMain, pressed && styles.sheetRowMainPressed]}
-                        onPress={() => navigateToSubreddit(item)}
-                      >
-                        <Text style={styles.sheetRowName}>r/{item}</Text>
-                        <Text style={styles.sheetChevron}>›</Text>
-                      </Pressable>
-                      <Pressable
-                        style={({ pressed }) => [styles.sheetDeleteBtn, pressed && styles.sheetDeleteBtnPressed]}
-                        onPress={() => handleDeleteFavorite(item)}
-                        hitSlop={8}
-                      >
-                        <Text style={styles.sheetDeleteIcon}>🗑</Text>
-                      </Pressable>
-                    </View>
-                  )}
-                  ItemSeparatorComponent={() => <View style={styles.sheetSeparator} />}
-                />
+                <View style={styles.sheetListContent}>
+                  {favorites.map((fav, index) => (
+                    <React.Fragment key={fav}>
+                      <View style={styles.sheetRow}>
+                        <Pressable
+                          style={({ pressed }) => [styles.sheetRowMain, pressed && styles.sheetRowMainPressed]}
+                          onPress={() => navigateToSubreddit(fav)}
+                        >
+                          <Text style={styles.sheetRowName}>r/{fav}</Text>
+                          <Text style={styles.sheetChevron}>›</Text>
+                        </Pressable>
+                        <Pressable
+                          style={({ pressed }) => [styles.sheetDeleteBtn, pressed && styles.sheetDeleteBtnPressed]}
+                          onPress={() => handleDeleteFavorite(fav)}
+                          hitSlop={8}
+                        >
+                          <Text style={styles.sheetDeleteIcon}>🗑</Text>
+                        </Pressable>
+                      </View>
+                      {index < favorites.length - 1 && (
+                        <View style={styles.sheetSeparator} />
+                      )}
+                    </React.Fragment>
+                  ))}
+                </View>
               )}
-            </View>
-          </KeyboardAvoidingView>
+            </ScrollView>
+          </View>
         </>
       )}
     </View>
@@ -553,27 +554,23 @@ const styles = StyleSheet.create({
   },
 
   // ── Bottom sheet ─────────────────────────────────────────────────────────────
-  // Full-screen scrim behind the sheet — positioned absolute so it doesn't
-  // affect layout of the screen below.
   sheetScrim: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.5)',
     zIndex: 99,
   },
-  // KeyboardAvoidingView wrapper — anchored at the bottom edge.
   sheetWrapper: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    margin: 0,
     zIndex: 100,
-  },
-  sheet: {
     backgroundColor: '#121212',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 24,
-    marginBottom: 0,
+    paddingHorizontal: 24,
+    paddingTop: 12,
     maxHeight: '70%' as any,
   },
   sheetHandle: {
@@ -665,9 +662,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sm,
     textAlign: 'center',
     lineHeight: 20,
-  },
-  sheetList: {
-    flex: 1,
   },
   sheetListContent: {
     backgroundColor: Colors.surface,

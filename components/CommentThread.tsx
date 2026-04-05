@@ -1,5 +1,5 @@
 ﻿import React, { memo, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Linking, LayoutAnimation } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Linking } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { RedditComment } from '../utils/types';
 import { buildMarkdownStyles, suppressImageRule } from '../utils/markdownStyles';
@@ -77,10 +77,7 @@ export const CommentThread = memo(function CommentThread({
       {isCollapsed ? (
         // ── Collapsed: tap the placeholder to expand ──────────────────────────
         <Pressable
-          onPress={() => {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setIsCollapsed(false);
-          }}
+          onPress={() => setIsCollapsed(false)}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="Expand comment"
@@ -91,10 +88,7 @@ export const CommentThread = memo(function CommentThread({
         // ── Expanded: tap the card to collapse ───────────────────────────────
         <>
           <Pressable
-            onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setIsCollapsed(true);
-            }}
+            onPress={() => setIsCollapsed(true)}
             hitSlop={4}
             accessibilityRole="button"
             accessibilityLabel="Collapse comment"
