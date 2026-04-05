@@ -33,7 +33,7 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
     !post.is_video &&
     (/\.(gif|gifv)(\?.*)?$/i.test(rawUrl));
 
-  // Imgur's .gifv container → serve the .mp4 equivalent directly
+  // Imgur .gifv container → serve the .mp4 equivalent directly
   const videoUrl = isGif ? rawUrl.replace(/\.gifv$/i, '.mp4') : null;
 
   const showVideo = !!videoUrl;
@@ -44,7 +44,7 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
     post.thumbnail !== 'default' &&
     post.thumbnail !== 'nsfw';
 
-  // Selftext preview for link-free text posts with no media
+  // Selftext preview for text posts with no media
   const showSelftext =
     !showVideo &&
     !showImage &&
@@ -70,6 +70,7 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
         flair_text: post.flair_text ?? '',
         over_18: post.over_18 ? '1' : '0',
         is_video: post.is_video ? '1' : '0',
+        url: post.url ?? '',
       },
     });
   }

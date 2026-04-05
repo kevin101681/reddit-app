@@ -1,203 +1,63 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   FlatList,
+  Linking,
+  Pressable,
   StyleSheet,
   Text,
   View,
-  Image,
-  Pressable,
-  Linking,
 } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import Markdown from 'react-native-markdown-display';
-import { getComments, formatRelativeTime, formatScore } from '../../utils/api';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getComments } from '../../utils/api';
 import { RedditComment } from '../../utils/types';
 import { CommentThread } from '../../components/CommentThread';
 import { SkeletonBox } from '../../components/SkeletonLoader';
-import { buildMarkdownStyles, suppressImageRule } from '../../utils/markdownStyles';
 import { Colors, Spacing, Typography, Radius } from '../../constants/theme';
 
-// --- Shared link handler � opens URLs in the device browser ------------------
+const BRAND = '#7ba0b3';
+const FAB_SIZE = 56;
 
-function openLink(url: string): boolean {
-  Linking.openURL(url).catch(() => {});
-  return true; // prevent default in-app navigation
-}
-
-// --- Markdown style memos -----------------------------------------------------
-
-const postMdStyles = buildMarkdownStyles({ fontSize: Typography.sm, lineHeight: 21 });
-
-// --- Comment skeleton ---------------------------------------------------------
+// ── Comment skeleton ──────────────────────────────────────────────────────────
 
 function CommentSkeleton() {
   return (
     <View style={styles.skeletonWrap}>
-      {Array.from({ length: 5 }).map((_, i) => (
+      {Array.from({ length: 6 }).map((_, i) => (
         <View key={i} style={[styles.skeletonBlock, { marginLeft: (i % 3) * Spacing.lg }]}>
-          <SkeletonBox width={100 + (i % 2) * 40} height={11} />
+          <SkeletonBox width={120 + (i % 2) * 40} height={11} />
           <SkeletonBox width="90%" height={14} style={{ marginTop: Spacing.xs }} />
-          <SkeletonBox width="70%" height={14} style={{ marginTop: 4 }} />
+          <SkeletonBox width="65%" height={14} style={{ marginTop: 4 }} />
         </View>
       ))}
     </View>
   );
 }
 
-// --- Post header -------------------------------------------------------------
-
-interface PostHeaderProps {
-  subreddit_name_prefixed: string;
-  title: string;
-  author: string;
-  score: number;
-  num_comments: number;
-  upvote_ratio: number;
-  created_utc: number;
-  permalink: string;
-  selftext: string;
-  image_url: string;
-  flair_text: string;
-  over_18: boolean;
-  commentCount: number;
-  commentsLoading: boolean;
-}
-
-function PostHeader({
-  subreddit_name_prefixed,
-  title,
-  author,
-  score,
-  num_comments,
-  upvote_ratio,
-  created_utc,
-  permalink,
-  selftext,
-  image_url,
-  flair_text,
-  over_18,
-  commentCount,
-  commentsLoading,
-}: PostHeaderProps) {
-  return (
-    <View style={styles.headerWrap}>
-      {/* Meta row */}
-      <View style={styles.metaRow}>
-        <Text style={styles.subreddit}>{subreddit_name_prefixed}</Text>
-        <Text style={styles.dot}> � </Text>
-        <Text style={styles.meta}>{formatRelativeTime(created_utc)}</Text>
-      </View>
-
-      {/* Flair */}
-      {flair_text ? (
-        <View style={styles.flairBadge}>
-          <Text style={styles.flairText} numberOfLines={1}>{flair_text}</Text>
-        </View>
-      ) : null}
-
-      {/* Title */}
-      <Text style={styles.postTitle}>
-        {over_18 ? '?? ' : ''}{title}
-      </Text>
-      <Text style={styles.postAuthor}>u/{author}</Text>
-
-      {/* Hero image */}
-      {image_url ? (
-        <Image source={{ uri: image_url }} style={styles.postImage} resizeMode="cover" />
-      ) : null}
-
-      {/* Self-text rendered as Markdown */}
-      {selftext ? (
-        <View style={styles.selftextBox}>
-          <Markdown
-            style={postMdStyles}
-            onLinkPress={openLink}
-            rules={suppressImageRule}
-          >
-            {selftext}
-          </Markdown>
-        </View>
-      ) : null}
-
-      {/* Read-only stats chips */}
-      <View style={styles.statsRow}>
-        <View style={styles.statChip}>
-          <Text style={styles.statChipText}>{formatScore(score)} pts</Text>
-        </View>
-        <View style={[styles.statChip, styles.statChipSecondary]}>
-          <Text style={styles.statChipSecondaryText}>
-            {formatScore(num_comments)} comments
-          </Text>
-        </View>
-        <View style={[styles.statChip, styles.statChipSecondary]}>
-          <Text style={styles.statChipSecondaryText}>
-            {Math.round(upvote_ratio * 100)}% upvoted
-          </Text>
-        </View>
-        <Pressable
-          onPress={() => Linking.openURL('https://reddit.com' + permalink)}
-          style={({ pressed }) => [
-            styles.statChip,
-            styles.linkChip,
-            pressed && { opacity: 0.6 },
-          ]}
-        >
-          <Text style={styles.linkText}>Open in Reddit ?</Text>
-        </Pressable>
-      </View>
-
-      {/* Divider + comments heading */}
-      <View style={styles.divider} />
-      <Text style={styles.commentsHeader}>
-        {commentsLoading
-          ? 'Loading comments�'
-          : `${commentCount} Comment${commentCount !== 1 ? 's' : ''}`}
-      </Text>
-    </View>
-  );
-}
-
-// --- Main screen --------------------------------------------------------------
+// ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function PostDetailScreen() {
+  const insets = useSafeAreaInsets();
+
   const params = useLocalSearchParams<{
     id: string;
     subreddit: string;
     subreddit_name_prefixed: string;
-    title: string;
-    author: string;
-    score: string;
-    num_comments: string;
-    upvote_ratio: string;
-    permalink: string;
-    selftext: string;
-    created_utc: string;
-    image_url: string;
-    flair_text: string;
-    over_18: string;
+    url: string;
   }>();
 
-  const {
-    id,
-    subreddit,
-    subreddit_name_prefixed,
-    title,
-    author,
-    permalink,
-    selftext,
-    image_url,
-    flair_text,
-  } = params;
+  const { id, subreddit, subreddit_name_prefixed, url } = params;
 
-  const score        = Number(params.score ?? 0);
-  const num_comments = Number(params.num_comments ?? 0);
-  const upvote_ratio = Number(params.upvote_ratio ?? 0);
-  const created_utc  = Number(params.created_utc ?? 0);
-  const over_18      = params.over_18 === '1';
+  // External link = has a URL that isn't a reddit.com domain (i.e. not a self-post)
+  const isExternalLink = !!url && url.length > 0 && !/reddit\.com/i.test(url);
 
-  const [comments, setComments]           = useState<RedditComment[]>([]);
+  // ── Comments state ──────────────────────────────────────────────────────────
+
+  const [comments, setComments]               = useState<RedditComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
-  const [commentsError, setCommentsError] = useState<string | null>(null);
+  const [commentsError, setCommentsError]     = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -226,6 +86,43 @@ export default function PostDetailScreen() {
     (c) => c.depth === 0 || c.depth === undefined
   );
 
+  // ── FAB hide-on-scroll animation ────────────────────────────────────────────
+  // translateY: 0 = visible, translateY: FAB_SIZE + inset = off-screen below
+
+  const fabTranslateY = useRef(new Animated.Value(0)).current;
+  const isFabHidden   = useRef(false);
+  const lastScrollY   = useRef(0);
+
+  function handleScroll(e: { nativeEvent: { contentOffset: { y: number } } }) {
+    const y  = e.nativeEvent.contentOffset.y;
+    const dy = y - lastScrollY.current;
+    lastScrollY.current = y;
+
+    if (Math.abs(dy) < 4) return; // ignore micro-jitter
+
+    if (dy > 0 && !isFabHidden.current) {
+      // Scrolling down → slide FAB off-screen
+      isFabHidden.current = true;
+      Animated.spring(fabTranslateY, {
+        toValue: FAB_SIZE + 32 + insets.bottom,
+        useNativeDriver: true,
+        damping: 20,
+        stiffness: 200,
+      }).start();
+    } else if (dy < 0 && isFabHidden.current) {
+      // Scrolling up → slide FAB back in
+      isFabHidden.current = false;
+      Animated.spring(fabTranslateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 20,
+        stiffness: 200,
+      }).start();
+    }
+  }
+
+  // ── Render helpers ──────────────────────────────────────────────────────────
+
   function renderComment({ item }: { item: RedditComment }) {
     return (
       <View style={styles.commentWrap}>
@@ -235,12 +132,14 @@ export default function PostDetailScreen() {
     );
   }
 
+  const fabPaddingBottom = insets.bottom > 0 ? insets.bottom : Spacing.lg;
+
   function renderListFooter() {
     if (commentsLoading) return <CommentSkeleton />;
     if (commentsError) {
       return (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>?? {commentsError}</Text>
+          <Text style={styles.errorText}>⚠️ {commentsError}</Text>
         </View>
       );
     }
@@ -251,11 +150,14 @@ export default function PostDetailScreen() {
         </View>
       );
     }
-    return <View style={{ height: Spacing.xxl }} />;
+    // Extra bottom padding so the last comment clears the FAB (when shown)
+    return <View style={{ height: isExternalLink ? FAB_SIZE + fabPaddingBottom + 24 : Spacing.xxl }} />;
   }
 
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   return (
-    <>
+    <View style={styles.screen}>
       <Stack.Screen options={{ title: subreddit_name_prefixed ?? `r/${subreddit}` }} />
 
       <FlatList
@@ -263,114 +165,107 @@ export default function PostDetailScreen() {
         data={topLevelComments}
         keyExtractor={(item) => item.id}
         renderItem={renderComment}
-        ListHeaderComponent={
-          <PostHeader
-            subreddit_name_prefixed={subreddit_name_prefixed ?? `r/${subreddit}`}
-            title={title ?? ''}
-            author={author ?? ''}
-            score={score}
-            num_comments={num_comments}
-            upvote_ratio={upvote_ratio}
-            created_utc={created_utc}
-            permalink={permalink ?? ''}
-            selftext={selftext ?? ''}
-            image_url={image_url ?? ''}
-            flair_text={flair_text ?? ''}
-            over_18={over_18}
-            commentCount={topLevelComments.length}
-            commentsLoading={commentsLoading}
-          />
-        }
         ListFooterComponent={renderListFooter}
+        onScroll={isExternalLink ? handleScroll : undefined}
+        scrollEventThrottle={16}
         removeClippedSubviews
         initialNumToRender={10}
         maxToRenderPerBatch={8}
         windowSize={7}
       />
-    </>
+
+      {/* External-link FAB — only rendered for link posts */}
+      {isExternalLink && (
+        <Animated.View
+          style={[
+            styles.fab,
+            {
+              bottom: fabPaddingBottom + Spacing.lg,
+              transform: [{ translateY: fabTranslateY }],
+            },
+          ]}
+          pointerEvents="box-none"
+        >
+          <Pressable
+            onPress={() => Linking.openURL(url).catch(() => {})}
+            style={({ pressed }) => [styles.fabBtn, pressed && styles.fabBtnPressed]}
+            accessibilityLabel="Open link in browser"
+            accessibilityRole="button"
+          >
+            <MaterialIcons name="open-in-browser" size={26} color="#fff" />
+          </Pressable>
+        </Animated.View>
+      )}
+    </View>
   );
 }
 
-// --- Styles -------------------------------------------------------------------
+// ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  list: { flex: 1, backgroundColor: Colors.background },
-
-  headerWrap: { padding: Spacing.lg, paddingBottom: 0 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.xs },
-  subreddit: { color: Colors.primary, fontSize: Typography.sm, fontWeight: '700' },
-  dot: { color: Colors.textDisabled, fontSize: Typography.sm },
-  meta: { color: Colors.textMuted, fontSize: Typography.sm },
-  flairBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.primaryMuted,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    marginBottom: Spacing.xs,
+  screen: {
+    flex: 1,
+    backgroundColor: Colors.background,
   },
-  flairText: { color: Colors.primary, fontSize: Typography.xs, fontWeight: '600' },
-  postTitle: {
-    color: Colors.text,
-    fontSize: Typography.xl,
-    fontWeight: '700',
-    lineHeight: 28,
-    marginBottom: Spacing.xs,
+  list: {
+    flex: 1,
+    backgroundColor: Colors.background,
   },
-  postAuthor: { color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing.md },
-  postImage: {
-    width: '100%',
-    height: 240,
-    borderRadius: Radius.md,
-    marginBottom: Spacing.md,
-    backgroundColor: Colors.border,
+  commentWrap: {
+    paddingHorizontal: Spacing.lg,
   },
-  selftextBox: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md },
-  statChip: {
-    backgroundColor: Colors.primaryMuted,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-  },
-  statChipText: { color: Colors.primary, fontSize: Typography.sm, fontWeight: '700' },
-  statChipSecondary: { backgroundColor: Colors.surfaceElevated },
-  statChipSecondaryText: { color: Colors.textMuted, fontSize: Typography.sm, fontWeight: '600' },
-  linkChip: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
-  linkText: { color: Colors.primary, fontSize: Typography.sm, fontWeight: '600' },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.border,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  commentsHeader: {
-    color: Colors.text,
-    fontSize: Typography.md,
-    fontWeight: '700',
-    marginBottom: Spacing.sm,
-  },
-  commentWrap: { paddingHorizontal: Spacing.lg },
   commentDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: Colors.border,
     marginTop: Spacing.md,
     marginBottom: Spacing.xs,
   },
-  skeletonWrap: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
-  skeletonBlock: { marginBottom: Spacing.lg },
+  skeletonWrap: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+  },
+  skeletonBlock: {
+    marginBottom: Spacing.lg,
+  },
   errorBox: {
     margin: Spacing.lg,
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     padding: Spacing.md,
   },
-  errorText: { color: Colors.textMuted, fontSize: Typography.sm },
-  noComments: { alignItems: 'center', padding: Spacing.xxl },
-  noCommentsText: { color: Colors.textMuted, fontSize: Typography.sm },
+  errorText: {
+    color: Colors.textMuted,
+    fontSize: Typography.sm,
+  },
+  noComments: {
+    alignItems: 'center',
+    padding: Spacing.xxl,
+  },
+  noCommentsText: {
+    color: Colors.textMuted,
+    fontSize: Typography.sm,
+  },
+
+  // ── FAB ────────────────────────────────────────────────────────────────────
+  fab: {
+    position: 'absolute',
+    right: Spacing.lg,
+  },
+  fabBtn: {
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
+    backgroundColor: BRAND,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Material 3 elevation
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: 5,
+  },
+  fabBtnPressed: {
+    opacity: 0.85,
+  },
 });
