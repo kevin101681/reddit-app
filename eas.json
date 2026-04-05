@@ -6,10 +6,6 @@
     "preview": {
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "EXPO_PUBLIC_NETLIFY_PROXY_URL": "https://redditrpoxykevin.netlify.app/.netlify/functions/proxy",
-        "EXPO_PUBLIC_NETLIFY_PROXY_URL_COMMENTS": "https://redditrpoxykevin.netlify.app/.netlify/functions/comments"
       }
     },
     "production": {
@@ -18,10 +14,6 @@
       },
       "ios": {
         "simulator": false
-      },
-      "env": {
-        "EXPO_PUBLIC_NETLIFY_PROXY_URL": "https://redditrpoxykevin.netlify.app/.netlify/functions/proxy",
-        "EXPO_PUBLIC_NETLIFY_PROXY_URL_COMMENTS": "https://redditrpoxykevin.netlify.app/.netlify/functions/comments"
       }
     }
   },

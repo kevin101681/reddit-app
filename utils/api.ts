@@ -1,66 +1,141 @@
-import { ProxyPostsResponse, ProxyCommentsResponse } from './types';
+import { RedditPost, RedditComment, PostsResponse, CommentsResponse } from './types';
 
-const PROXY_URL = process.env.EXPO_PUBLIC_NETLIFY_PROXY_URL;
-const COMMENTS_URL = process.env.EXPO_PUBLIC_NETLIFY_PROXY_URL_COMMENTS;
+const REDDIT_BASE = 'https://www.reddit.com';
 
-if (__DEV__) {
-  if (!PROXY_URL) console.warn('[api] EXPO_PUBLIC_NETLIFY_PROXY_URL is not set.');
-  if (!COMMENTS_URL) console.warn('[api] EXPO_PUBLIC_NETLIFY_PROXY_URL_COMMENTS is not set.');
-}
+/**
+ * Mobile-formatted User-Agent required by Reddit to avoid rate-limiting.
+ * Format: platform:appID:version (by /u/username)
+ */
+const USER_AGENT = 'android:com.personal.redditapp:v1.0.0 (by /u/kevin101681)';
 
-function requireEnv(value: string | undefined, name: string): string {
-  if (!value) throw new Error(`${name} is not configured. Set it in your .env.local file.`);
-  return value.replace(/\/$/, '');
-}
+// --- Core fetch --------------------------------------------------------------
 
-async function apiFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
+async function redditFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, {
-    headers: { Accept: 'application/json' },
+    headers: {
+      'Accept':     'application/json',
+      'User-Agent': USER_AGENT,
+    },
     signal,
   });
   if (!response.ok) {
-    throw new Error(`API error ${response.status}: ${response.statusText}`);
+    throw new Error(`Reddit API error ${response.status}: ${response.statusText}`);
   }
   return response.json() as Promise<T>;
 }
 
+// --- Post normalizer ----------------------------------------------------------
+
+function normalizePost(child: any): RedditPost | null {
+  if (child.kind !== 't3') return null;
+  const d = child.data;
+  return {
+    id:                      d.id,
+    name:                    d.name,
+    title:                   d.title      ?? '',
+    author:                  d.author     ?? '[deleted]',
+    subreddit:               d.subreddit  ?? '',
+    subreddit_name_prefixed: d.subreddit_name_prefixed ?? `r/${d.subreddit}`,
+    score:                   d.score ?? d.ups ?? 0,
+    num_comments:            d.num_comments ?? 0,
+    url:                     d.url        ?? '',
+    permalink:               d.permalink  ?? '',
+    thumbnail:               d.thumbnail  ?? '',
+    preview:                 d.preview,
+    selftext:                d.selftext   ?? '',
+    is_video:                d.is_video   ?? false,
+    created_utc:             d.created_utc ?? 0,
+    upvote_ratio:            d.upvote_ratio ?? 0,
+    stickied:                d.stickied  ?? false,
+    over_18:                 d.over_18   ?? false,
+    flair_text:              d.link_flair_text ?? d.flair_text ?? null,
+  };
+}
+
+// --- Comment normalizer (recursive) ------------------------------------------
+
+function normalizeComment(child: any, depth = 0): RedditComment | null {
+  // Filter out "more" sentinel nodes — these are lazy-load placeholders
+  // that have no body and would crash the comment tree renderer.
+  if (!child || child.kind === 'more' || child.kind !== 't1') return null;
+
+  const d = child.data;
+
+  // Recurse into nested replies, dropping more-nodes at every level
+  let replies: RedditComment[] = [];
+  if (d.replies && typeof d.replies === 'object') {
+    const replyChildren: any[] = d.replies?.data?.children ?? [];
+    replies = replyChildren
+      .map((c: any) => normalizeComment(c, depth + 1))
+      .filter((c): c is RedditComment => c !== null);
+  }
+
+  return {
+    id:          d.id         ?? '',
+    author:      d.author     ?? '[deleted]',
+    body:        d.body       ?? '',
+    score:       d.score      ?? 0,
+    created_utc: d.created_utc ?? 0,
+    depth,
+    replies:     replies.length > 0 ? replies : undefined,
+  };
+}
+
+// --- Public API ---------------------------------------------------------------
+
 /**
- * Fetch a page of posts.
- * GET {PROXY_URL}?subreddit=<sub>&sort=<sort>[&after=<cursor>]
- * Response: { posts: RedditPost[], after: string | null }
+ * Fetch a page of posts directly from Reddit.
+ * GET https://www.reddit.com/r/{subreddit}/{sort}.json?limit=25[&after=cursor]
  */
 export async function getPosts(
   subreddit: string,
   sort: string,
   after?: string,
   signal?: AbortSignal
-): Promise<ProxyPostsResponse> {
-  const base = requireEnv(PROXY_URL, 'EXPO_PUBLIC_NETLIFY_PROXY_URL');
-  const params = new URLSearchParams({ subreddit, sort });
+): Promise<PostsResponse> {
+  const params = new URLSearchParams({ limit: '25', raw_json: '1' });
   if (after) params.set('after', after);
-  return apiFetch<ProxyPostsResponse>(`${base}?${params.toString()}`, signal);
+
+  const url = `${REDDIT_BASE}/r/${encodeURIComponent(subreddit)}/${encodeURIComponent(sort)}.json?${params}`;
+  const raw = await redditFetch<any>(url, signal);
+
+  const posts = (raw?.data?.children ?? [])
+    .map(normalizePost)
+    .filter((p: RedditPost | null): p is RedditPost => p !== null);
+
+  return { posts, after: raw?.data?.after ?? null };
 }
 
 /**
- * Fetch the comment tree for a post.
- * GET {COMMENTS_URL}?subreddit=<sub>&id=<postId>
- * Response: { comments: RedditComment[] }
+ * Fetch the comment tree for a post directly from Reddit.
+ * GET https://www.reddit.com/r/{subreddit}/comments/{postId}.json
+ * Reddit returns a two-element array: [postListing, commentsListing].
  */
 export async function getComments(
   subreddit: string,
   postId: string,
   signal?: AbortSignal
-): Promise<ProxyCommentsResponse> {
-  const base = requireEnv(COMMENTS_URL, 'EXPO_PUBLIC_NETLIFY_PROXY_URL_COMMENTS');
-  const params = new URLSearchParams({ subreddit, id: postId });
-  return apiFetch<ProxyCommentsResponse>(`${base}?${params.toString()}`, signal);
+): Promise<CommentsResponse> {
+  const url = `${REDDIT_BASE}/r/${encodeURIComponent(subreddit)}/comments/${encodeURIComponent(postId)}.json?raw_json=1&limit=200`;
+  const raw = await redditFetch<any[]>(url, signal);
+
+  // raw[0] = post listing, raw[1] = comments listing
+  const commentChildren: any[] = raw?.[1]?.data?.children ?? [];
+
+  const comments = commentChildren
+    .map((c: any) => normalizeComment(c, 0))
+    .filter((c): c is RedditComment => c !== null);
+
+  return { comments };
 }
+
+// --- Utilities ----------------------------------------------------------------
 
 /** Format a Unix timestamp into a relative time string */
 export function formatRelativeTime(utc: number): string {
   const diff = Math.floor(Date.now() / 1000) - utc;
-  if (diff < 60) return `${diff}s`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 60)    return `${diff}s`;
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
   return `${Math.floor(diff / 604800)}w`;
@@ -69,6 +144,6 @@ export function formatRelativeTime(utc: number): string {
 /** Compact number formatting: 1200 ? "1.2k" */
 export function formatScore(score: number): string {
   if (score >= 1_000_000) return `${(score / 1_000_000).toFixed(1)}m`;
-  if (score >= 1_000) return `${(score / 1_000).toFixed(1)}k`;
+  if (score >= 1_000)     return `${(score / 1_000).toFixed(1)}k`;
   return String(score);
 }

@@ -2,7 +2,7 @@
 
 export interface RedditPost {
   id: string;
-  name: string;              // Reddit fullname, e.g. "t3_abc123" — used as pagination cursor
+  name: string;              // Reddit fullname, e.g. "t3_abc123" — pagination cursor
   title: string;
   author: string;
   subreddit: string;
@@ -37,18 +37,18 @@ export interface RedditComment {
   replies?: RedditComment[];
 }
 
-/** Flat posts response from the Netlify proxy */
-export interface ProxyPostsResponse {
+/** Normalised posts page returned by getPosts() */
+export interface PostsResponse {
   posts: RedditPost[];
   after: string | null;
 }
 
-/** Flat comments response from the Netlify comments proxy */
-export interface ProxyCommentsResponse {
+/** Normalised comments list returned by getComments() */
+export interface CommentsResponse {
   comments: RedditComment[];
 }
 
-// Reddit listing types (retained for any endpoints that still return them)
+/** Raw Reddit listing wrapper (used internally by normalizers) */
 export interface RedditListingChild<T> {
   kind: string;
   data: T;
