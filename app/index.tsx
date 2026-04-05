@@ -3,7 +3,6 @@ import {
   Animated,
   FlatList,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -349,106 +348,102 @@ export default function FrontpageScreen() {
         </Pressable>
       </Animated.View>
 
-      {/* Slide-up bottom sheet for subreddit navigation */}
-      <Modal
-        visible={isMenuOpen}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setIsMenuOpen(false)}
-      >
-        {/* Scrim backdrop — tap to dismiss */}
-        <Pressable
-          style={styles.sheetBackdrop}
-          onPress={() => setIsMenuOpen(false)}
-        />
+      {/* Subreddit panel — absolute-positioned, anchored flush to bottom */}
+      {isMenuOpen && (
+        <>
+          {/* Scrim — tap outside the sheet to dismiss */}
+          <Pressable
+            style={styles.sheetScrim}
+            onPress={() => setIsMenuOpen(false)}
+          />
 
-        {/* Bottom sheet container */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.sheetWrapper}
-        >
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
-            {/* Drag handle */}
-            <View style={styles.sheetHandle} />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.sheetWrapper}
+          >
+            <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
+              {/* Drag handle */}
+              <View style={styles.sheetHandle} />
 
-            {/* Header */}
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Subreddits</Text>
-              <Pressable
-                style={({ pressed }) => [styles.sheetClose, pressed && styles.sheetClosePressed]}
-                onPress={() => setIsMenuOpen(false)}
-                hitSlop={8}
-                accessibilityLabel="Close menu"
-                accessibilityRole="button"
-              >
-                <Text style={styles.sheetCloseText}>✕</Text>
-              </Pressable>
-            </View>
-
-            {/* Search row */}
-            <View style={styles.sheetSearchRow}>
-              <TextInput
-                style={styles.sheetInput}
-                placeholder="r/subreddit name…"
-                placeholderTextColor={Colors.textDisabled}
-                value={menuInput}
-                onChangeText={setMenuInput}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="go"
-                onSubmitEditing={() => navigateToSubreddit(menuInput)}
-              />
-              <Pressable
-                style={({ pressed }) => [styles.sheetGoBtn, pressed && styles.sheetGoBtnPressed]}
-                onPress={() => navigateToSubreddit(menuInput)}
-              >
-                <Text style={styles.sheetGoBtnText}>Go</Text>
-              </Pressable>
-            </View>
-
-            {/* Favourites list */}
-            <Text style={styles.sheetSectionLabel}>
-              {favorites.length === 0 ? 'NO FAVOURITES YET' : 'FAVOURITES'}
-            </Text>
-
-            {favorites.length === 0 ? (
-              <View style={styles.sheetEmpty}>
-                <Text style={styles.sheetEmptyStar}>☆</Text>
-                <Text style={styles.sheetEmptyTitle}>No saved subreddits</Text>
-                <Text style={styles.sheetEmptyHint}>
-                  Browse any subreddit and tap the ★ star in the header to save it here.
-                </Text>
+              {/* Header */}
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>Subreddits</Text>
+                <Pressable
+                  style={({ pressed }) => [styles.sheetClose, pressed && styles.sheetClosePressed]}
+                  onPress={() => setIsMenuOpen(false)}
+                  hitSlop={8}
+                  accessibilityLabel="Close menu"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.sheetCloseText}>✕</Text>
+                </Pressable>
               </View>
-            ) : (
-              <FlatList
-                data={favorites}
-                keyExtractor={(item) => item}
-                style={styles.sheetList}
-                contentContainerStyle={styles.sheetListContent}
-                renderItem={({ item }) => (
-                  <View style={styles.sheetRow}>
-                    <Pressable
-                      style={({ pressed }) => [styles.sheetRowMain, pressed && styles.sheetRowMainPressed]}
-                      onPress={() => navigateToSubreddit(item)}
-                    >
-                      <Text style={styles.sheetRowName}>r/{item}</Text>
-                      <Text style={styles.sheetChevron}>›</Text>
-                    </Pressable>
-                    <Pressable
-                      style={({ pressed }) => [styles.sheetDeleteBtn, pressed && styles.sheetDeleteBtnPressed]}
-                      onPress={() => handleDeleteFavorite(item)}
-                      hitSlop={8}
-                    >
-                      <Text style={styles.sheetDeleteIcon}>🗑</Text>
-                    </Pressable>
-                  </View>
-                )}
-                ItemSeparatorComponent={() => <View style={styles.sheetSeparator} />}
-              />
-            )}
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+
+              {/* Search row */}
+              <View style={styles.sheetSearchRow}>
+                <TextInput
+                  style={styles.sheetInput}
+                  placeholder="r/subreddit name…"
+                  placeholderTextColor={Colors.textDisabled}
+                  value={menuInput}
+                  onChangeText={setMenuInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="go"
+                  onSubmitEditing={() => navigateToSubreddit(menuInput)}
+                />
+                <Pressable
+                  style={({ pressed }) => [styles.sheetGoBtn, pressed && styles.sheetGoBtnPressed]}
+                  onPress={() => navigateToSubreddit(menuInput)}
+                >
+                  <Text style={styles.sheetGoBtnText}>Go</Text>
+                </Pressable>
+              </View>
+
+              {/* Favourites list */}
+              <Text style={styles.sheetSectionLabel}>
+                {favorites.length === 0 ? 'NO FAVOURITES YET' : 'FAVOURITES'}
+              </Text>
+
+              {favorites.length === 0 ? (
+                <View style={styles.sheetEmpty}>
+                  <Text style={styles.sheetEmptyStar}>☆</Text>
+                  <Text style={styles.sheetEmptyTitle}>No saved subreddits</Text>
+                  <Text style={styles.sheetEmptyHint}>
+                    Browse any subreddit and tap the ★ star in the header to save it here.
+                  </Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={favorites}
+                  keyExtractor={(item) => item}
+                  style={styles.sheetList}
+                  contentContainerStyle={styles.sheetListContent}
+                  renderItem={({ item }) => (
+                    <View style={styles.sheetRow}>
+                      <Pressable
+                        style={({ pressed }) => [styles.sheetRowMain, pressed && styles.sheetRowMainPressed]}
+                        onPress={() => navigateToSubreddit(item)}
+                      >
+                        <Text style={styles.sheetRowName}>r/{item}</Text>
+                        <Text style={styles.sheetChevron}>›</Text>
+                      </Pressable>
+                      <Pressable
+                        style={({ pressed }) => [styles.sheetDeleteBtn, pressed && styles.sheetDeleteBtnPressed]}
+                        onPress={() => handleDeleteFavorite(item)}
+                        hitSlop={8}
+                      >
+                        <Text style={styles.sheetDeleteIcon}>🗑</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                  ItemSeparatorComponent={() => <View style={styles.sheetSeparator} />}
+                />
+              )}
+            </View>
+          </KeyboardAvoidingView>
+        </>
+      )}
     </View>
   );
 }
@@ -558,22 +553,28 @@ const styles = StyleSheet.create({
   },
 
   // ── Bottom sheet ─────────────────────────────────────────────────────────────
-  sheetBackdrop: {
-    flex: 1,
+  // Full-screen scrim behind the sheet — positioned absolute so it doesn't
+  // affect layout of the screen below.
+  sheetScrim: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 99,
   },
+  // KeyboardAvoidingView wrapper — anchored at the bottom edge.
   sheetWrapper: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    zIndex: 100,
   },
   sheet: {
     backgroundColor: '#121212',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    height: '60%' as any,
+    marginBottom: 0,
+    maxHeight: '70%' as any,
   },
   sheetHandle: {
     width: 36,
