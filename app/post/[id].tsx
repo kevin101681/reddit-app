@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   FlatList,
   Linking,
@@ -82,12 +83,9 @@ export default function PostDetailScreen() {
     return () => abortRef.current?.abort();
   }, [id, subreddit]);
 
-  // Guard: only pass comments to FlatList once loading is fully done.
-  // This prevents LayoutAnimation (triggered by a user tap) from catching
-  // the skeleton→data mount transition and producing a layout glitch.
-  const topLevelComments = commentsLoading
-    ? []
-    : comments.filter((c) => c.depth === 0 || c.depth === undefined);
+  const topLevelComments = comments.filter(
+    (c) => c.depth === 0 || c.depth === undefined
+  );
 
   // ── FAB hide-on-scroll animation ────────────────────────────────────────────
   // translateY: 0 = visible, translateY: FAB_SIZE + inset = off-screen below
@@ -138,7 +136,6 @@ export default function PostDetailScreen() {
   const fabPaddingBottom = insets.bottom > 0 ? insets.bottom : Spacing.lg;
 
   function renderListFooter() {
-    if (commentsLoading) return <CommentSkeleton />;
     if (commentsError) {
       return (
         <View style={styles.errorBox}>
@@ -146,12 +143,16 @@ export default function PostDetailScreen() {
         </View>
       );
     }
-    if (topLevelComments.length === 0) {
+    if (topLevelComments.length === 0 && !commentsLoading) {
       return (
         <View style={styles.noComments}>
           <Text style={styles.noCommentsText}>No comments yet.</Text>
         </View>
       );
+    }
+    // Show spinner at the bottom when re-fetching over existing data
+    if (commentsLoading && topLevelComments.length > 0) {
+      return <ActivityIndicator color={BRAND} style={styles.loadingMore} />;
     }
     // Extra bottom padding so the last comment clears the FAB (when shown)
     return <View style={{ height: isExternalLink ? FAB_SIZE + fabPaddingBottom + 24 : Spacing.xxl }} />;
@@ -163,19 +164,24 @@ export default function PostDetailScreen() {
     <View style={styles.screen}>
       <Stack.Screen options={{ title: subreddit_name_prefixed ?? `r/${subreddit}` }} />
 
-      <FlatList
-        style={styles.list}
-        data={topLevelComments}
-        keyExtractor={(item) => item.id}
-        renderItem={renderComment}
-        ListFooterComponent={renderListFooter}
-        onScroll={isExternalLink ? handleScroll : undefined}
-        scrollEventThrottle={16}
-        removeClippedSubviews
-        initialNumToRender={10}
-        maxToRenderPerBatch={8}
-        windowSize={7}
-      />
+      {/* Skeleton shown only on first load before any data arrives */}
+      {commentsLoading && topLevelComments.length === 0 ? (
+        <CommentSkeleton />
+      ) : (
+        <FlatList
+          style={styles.list}
+          data={topLevelComments}
+          keyExtractor={(item) => item.id}
+          renderItem={renderComment}
+          ListFooterComponent={renderListFooter}
+          onScroll={isExternalLink ? handleScroll : undefined}
+          scrollEventThrottle={16}
+          removeClippedSubviews
+          initialNumToRender={10}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+        />
+      )}
 
       {/* External-link FAB — only rendered for link posts */}
       {isExternalLink && (
@@ -247,6 +253,9 @@ const styles = StyleSheet.create({
   noCommentsText: {
     color: Colors.textMuted,
     fontSize: Typography.sm,
+  },
+  loadingMore: {
+    paddingVertical: Spacing.xl,
   },
 
   // ── FAB ────────────────────────────────────────────────────────────────────

@@ -5,8 +5,6 @@ import { RedditComment } from '../utils/types';
 import { buildMarkdownStyles, suppressImageRule } from '../utils/markdownStyles';
 import { Colors, Spacing, Typography } from '../constants/theme';
 
-const BRAND = '#7ba0b3';
-
 // Cold-theme depth palette — cycles seamlessly via modulo for deeper nesting.
 const DEPTH_COLORS = [
   '#7ba0b3', // 0 — brand / lightest
@@ -73,10 +71,11 @@ export const CommentThread = memo(function CommentThread({
     return (
       <Pressable
         onPress={() => setIsCollapsed(false)}
+        style={{ paddingVertical: 8, paddingHorizontal: 12 }}
         accessibilityRole="button"
         accessibilityLabel="Expand comment"
       >
-        <Text style={styles.collapsedPlaceholder}>[+] {comment.author}</Text>
+        <Text style={{ color: '#7ba0b3', fontWeight: 'bold' }}>[+] {comment.author}</Text>
       </Pressable>
     );
   }
@@ -121,12 +120,6 @@ const styles = StyleSheet.create({
   container: {
     marginTop: Spacing.sm,
     paddingTop: Spacing.xs,
-  },
-  collapsedPlaceholder: {
-    color: BRAND,
-    fontSize: Typography.xs,
-    fontWeight: '700',
-    padding: 12,
   },
   card: {
     backgroundColor: '#1E1E1E',

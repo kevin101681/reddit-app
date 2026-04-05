@@ -298,10 +298,11 @@ export default function FrontpageScreen() {
   };
 
   return (
-    // Plain View — extends to the physical screen edges including bottom.
-    // paddingTop keeps content below the status bar; bottom is left at 0
-    // so the absolute-positioned menu panel can sit flush with the screen edge.
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    // Plain View — extends to the physical screen edges.
+    // expo-router's Stack.Screen handles the top safe area natively via the
+    // header; no paddingTop needed here. Bottom stays at 0 so the absolute
+    // menu panel anchors flush to the physical screen edge.
+    <View style={styles.screen}>
       <Stack.Screen
         options={{
           title: 'r/all',
