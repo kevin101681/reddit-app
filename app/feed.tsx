@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   RefreshControl,
@@ -201,6 +201,6 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   starIconFilled: {
-    color: Colors.gold,
+    color: '#7ba0b3',
   },
 });

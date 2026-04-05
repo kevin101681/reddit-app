@@ -1,3 +1,4 @@
+﻿import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '../constants/theme';
@@ -13,9 +14,18 @@ export default function RootLayout() {
           headerTitleStyle: { fontWeight: '700', color: Colors.text },
           contentStyle: { backgroundColor: Colors.background },
           animation: 'slide_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
         }}
       >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="menu"
+          options={{
+            presentation: Platform.OS === 'ios' ? 'formSheet' : 'modal',
+            headerShown: false,
+          }}
+        />
         <Stack.Screen
           name="feed"
           options={{ headerBackTitle: 'Back' }}

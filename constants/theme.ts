@@ -11,6 +11,7 @@
   upvote: '#ff4500',
   downvote: '#7193ff',
   gold: '#ffd700',
+  brand: '#7ba0b3',
   tabBar: '#141414',
   tabBarActive: '#ff4500',
   tabBarInactive: '#555555',

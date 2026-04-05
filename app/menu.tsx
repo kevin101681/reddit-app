@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+﻿import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -11,21 +11,27 @@ import {
   Alert,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { getFavorites, removeFavorite } from '../../utils/storage';
-import { Colors, Spacing, Typography, Radius } from '../../constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getFavorites, removeFavorite } from '../utils/storage';
+import { Colors, Spacing, Typography, Radius } from '../constants/theme';
+
+const BRAND = '#7ba0b3';
 
 function navigate(subreddit: string) {
   const sub = subreddit.trim().replace(/^r\//i, '');
   if (!sub) return;
-  router.push({ pathname: '/feed', params: { subreddit: sub } });
+  router.dismiss();
+  // Small defer so the modal can animate out first
+  setTimeout(() => {
+    router.push({ pathname: '/feed', params: { subreddit: sub } });
+  }, 50);
 }
 
-export default function SubredditsScreen() {
+export default function MenuScreen() {
+  const insets = useSafeAreaInsets();
   const [input, setInput] = useState('');
   const [favorites, setFavorites] = useState<string[]>([]);
 
-  // Reload from storage every time this tab comes into focus so changes
-  // made on the feed screen (star toggle) are reflected immediately.
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -54,14 +60,31 @@ export default function SubredditsScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { paddingBottom: insets.bottom }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Custom subreddit search */}
+      {/* Drag handle */}
+      <View style={styles.handle} />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Subreddits</Text>
+        <Pressable
+          style={({ pressed }) => [styles.closeBtn, pressed && styles.closeBtnPressed]}
+          onPress={() => router.dismiss()}
+          hitSlop={8}
+          accessibilityLabel="Close menu"
+          accessibilityRole="button"
+        >
+          <Text style={styles.closeBtnText}>✕</Text>
+        </Pressable>
+      </View>
+
+      {/* Search row */}
       <View style={styles.searchRow}>
         <TextInput
           style={styles.input}
-          placeholder="r/subreddit name�"
+          placeholder="r/subreddit name…"
           placeholderTextColor={Colors.textDisabled}
           value={input}
           onChangeText={setInput}
@@ -78,7 +101,7 @@ export default function SubredditsScreen() {
         </Pressable>
       </View>
 
-      {/* Persisted favourites */}
+      {/* Favourites */}
       <Text style={styles.sectionLabel}>
         {favorites.length === 0 ? 'NO FAVOURITES YET' : 'FAVOURITES'}
       </Text>
@@ -98,7 +121,6 @@ export default function SubredditsScreen() {
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <View style={styles.row}>
-              {/* Navigate on tap */}
               <Pressable
                 style={({ pressed }) => [styles.rowMain, pressed && styles.rowMainPressed]}
                 onPress={() => navigate(item)}
@@ -106,8 +128,6 @@ export default function SubredditsScreen() {
                 <Text style={styles.rowName}>r/{item}</Text>
                 <Text style={styles.chevron}>{'\u203a'}</Text>
               </Pressable>
-
-              {/* Delete button */}
               <Pressable
                 style={({ pressed }) => [styles.deleteBtn, pressed && styles.deleteBtnPressed]}
                 onPress={() => handleDelete(item)}
@@ -129,10 +149,46 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.border,
+    alignSelf: 'center',
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+  },
+  headerTitle: {
+    flex: 1,
+    color: Colors.text,
+    fontSize: Typography.lg,
+    fontWeight: '700',
+  },
+  closeBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeBtnPressed: { opacity: 0.6 },
+  closeBtnText: {
+    color: Colors.textMuted,
+    fontSize: Typography.md,
+    lineHeight: 18,
+  },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    margin: Spacing.md,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
     gap: Spacing.sm,
   },
   input: {
@@ -147,7 +203,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   goBtn: {
-    backgroundColor: Colors.primary,
+    backgroundColor: BRAND,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
@@ -161,7 +217,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.xs,
-    marginTop: Spacing.sm,
+    marginTop: Spacing.xs,
   },
   emptyState: {
     flex: 1,
@@ -205,9 +261,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
   },
-  rowMainPressed: {
-    backgroundColor: Colors.surfaceElevated,
-  },
+  rowMainPressed: { backgroundColor: Colors.surfaceElevated },
   rowName: {
     flex: 1,
     color: Colors.text,
@@ -225,9 +279,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
   },
   deleteBtnPressed: { opacity: 0.4 },
-  deleteIcon: {
-    fontSize: 18,
-  },
+  deleteIcon: { fontSize: 18 },
   separator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: Colors.border,

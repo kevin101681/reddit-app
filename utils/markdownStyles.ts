@@ -1,10 +1,10 @@
-/**
+ï»¿/**
  * Shared dark-theme style factory for react-native-markdown-display.
  *
  * Call buildMarkdownStyles() for post body text.
  * Pass a smaller fontSize for comment bodies to handle tight nesting.
  *
- * Inline images are intentionally omitted here — callers should pass the
+ * Inline images are intentionally omitted here ï¿½ callers should pass the
  * `imageRules` export as the `rules` prop to suppress them entirely and
  * prevent pixel-tracker requests from embedded Reddit markdown.
  */
@@ -102,7 +102,7 @@ export function buildMarkdownStyles({
     list_item_content: { flex: 1, flexShrink: 1 },
 
     // Inline styles
-    link:   { color: Colors.primary },
+    link:   { color: '#7ba0b3' },
     strong: { color: Colors.text, fontWeight: '700' as const },
     em:     { color: Colors.text, fontStyle: 'italic' as const },
     s:      { color: Colors.textMuted, textDecorationLine: 'line-through' as const },
