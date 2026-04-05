@@ -82,9 +82,12 @@ export default function PostDetailScreen() {
     return () => abortRef.current?.abort();
   }, [id, subreddit]);
 
-  const topLevelComments = comments.filter(
-    (c) => c.depth === 0 || c.depth === undefined
-  );
+  // Guard: only pass comments to FlatList once loading is fully done.
+  // This prevents LayoutAnimation (triggered by a user tap) from catching
+  // the skeleton→data mount transition and producing a layout glitch.
+  const topLevelComments = commentsLoading
+    ? []
+    : comments.filter((c) => c.depth === 0 || c.depth === undefined);
 
   // ── FAB hide-on-scroll animation ────────────────────────────────────────────
   // translateY: 0 = visible, translateY: FAB_SIZE + inset = off-screen below

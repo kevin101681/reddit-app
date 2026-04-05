@@ -7,14 +7,14 @@ import { Colors, Spacing, Typography } from '../constants/theme';
 
 const BRAND = '#7ba0b3';
 
-// One distinct border color per nesting depth — cycles after 6 levels
+// Cold-theme depth palette — cycles seamlessly via modulo for deeper nesting.
 const DEPTH_COLORS = [
-  Colors.primary,  // 0 — orange
-  '#7193ff',       // 1 — periwinkle
-  '#46d160',       // 2 — green
-  '#ffd635',       // 3 — gold
-  '#ff585b',       // 4 — coral
-  '#00b4d8',       // 5 — teal
+  '#7ba0b3', // 0 — brand / lightest
+  '#5a879d', // 1
+  '#457287', // 2
+  '#345e72', // 3
+  '#264a5c', // 4
+  '#1b3847', // 5 — deepest oceanic
 ];
 
 function depthColor(depth: number): string {
