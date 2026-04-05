@@ -8,8 +8,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_NETLIFY_PROXY_URL": "https://redditproxykevin.netlify.app",
-        "EXPO_PUBLIC_NETLIFY_PROXY_URL_COMMENTS": "https://redditproxykevin.netlify.app/comments"
+        "EXPO_PUBLIC_NETLIFY_PROXY_URL": "https://redditproxykevin.netlify.app/.netlify/functions/proxy",
+        "EXPO_PUBLIC_NETLIFY_PROXY_URL_COMMENTS": "https://redditproxykevin.netlify.app/.netlify/functions/comments"
       }
     },
     "production": {
