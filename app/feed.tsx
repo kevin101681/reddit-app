@@ -30,14 +30,20 @@ const SORT_OPTIONS = [
   { label: 'Controversial', value: 'controversial' },
 ] as const;
 
-// Stable outside the component — FlatList requires a non-changing reference
-const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 70 };
-
 export default function FeedScreen() {
   const { subreddit } = useLocalSearchParams<{ subreddit: string }>();
   const sub = (Array.isArray(subreddit) ? subreddit[0] : subreddit) ?? 'popular';
 
-  // Sort preference — loaded from storage on mount
+  // ── Viewability — MUST be useRef so FlatList never sees a new reference ─────
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      setActivePostId(viewableItems[0]?.item?.id ?? null);
+    }
+  ).current;
+
+  // ── Sort preference ─────────────────────────────────────────────────────────
   const [sort, setSort] = useState('hot');
 
   useEffect(() => {
@@ -47,7 +53,7 @@ export default function FeedScreen() {
   }, []);
 
   const handleSortSelect = useCallback(async (newSort: string) => {
-    setSortPreference(newSort); // fire-and-forget
+    setSortPreference(newSort);
     setSort(newSort);
   }, []);
 
@@ -57,16 +63,8 @@ export default function FeedScreen() {
 
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        {
-          title: 'Sort by',
-          options: [...labels, 'Cancel'],
-          cancelButtonIndex: labels.length,
-        },
-        (index) => {
-          if (index < SORT_OPTIONS.length) {
-            handleSortSelect(SORT_OPTIONS[index].value);
-          }
-        }
+        { title: 'Sort by', options: [...labels, 'Cancel'], cancelButtonIndex: labels.length },
+        (i) => { if (i < SORT_OPTIONS.length) handleSortSelect(SORT_OPTIONS[i].value); }
       );
     } else {
       Alert.alert(
@@ -84,18 +82,18 @@ export default function FeedScreen() {
     }
   }
 
-  // Feed state
-  const [posts, setPosts] = useState<RedditPost[]>([]);
-  const [loading, setLoading] = useState(true);
+  // ── Feed state ──────────────────────────────────────────────────────────────
+  const [posts, setPosts]           = useState<RedditPost[]>([]);
+  const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [after, setAfter] = useState<string | undefined>(undefined);
-  const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [after, setAfter]           = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Favourite state
+  // ── Favourite state ─────────────────────────────────────────────────────────
   const [isFavorited, setIsFavorited] = useState(false);
 
   useEffect(() => {
@@ -116,15 +114,7 @@ export default function FeedScreen() {
     }
   }
 
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      setActivePostId(viewableItems[0]?.item?.id ?? null);
-    },
-    []
-  );
-
-  // fetchPosts captures both 'sub' and 'sort'. A new function reference is
-  // created whenever either changes, triggering the reset effect below.
+  // ── Data fetching ───────────────────────────────────────────────────────────
   const fetchPosts = useCallback(
     async (reset: boolean, cursor?: string) => {
       abortRef.current?.abort();
@@ -140,15 +130,12 @@ export default function FeedScreen() {
         setAfter(nextCursor ?? undefined);
         setHasMore(!!nextCursor && data.posts.length > 0);
       } catch (err: any) {
-        if (err?.name !== 'AbortError') {
-          setError(err?.message ?? 'Failed to load posts');
-        }
+        if (err?.name !== 'AbortError') setError(err?.message ?? 'Failed to load posts');
       }
     },
     [sub, sort]
   );
 
-  // Fires whenever fetchPosts changes — covers both subreddit AND sort changes.
   useEffect(() => {
     setLoading(true);
     setPosts([]);
@@ -247,7 +234,7 @@ export default function FeedScreen() {
           }
           onEndReached={onEndReached}
           onEndReachedThreshold={0.4}
-          viewabilityConfig={VIEWABILITY_CONFIG}
+          viewabilityConfig={viewabilityConfig}
           onViewableItemsChanged={onViewableItemsChanged}
           removeClippedSubviews
           initialNumToRender={10}
@@ -294,7 +281,6 @@ const styles = StyleSheet.create({
   },
   errorBannerText: { color: Colors.textMuted, fontSize: Typography.sm },
   loadingMore: { paddingVertical: Spacing.xl },
-
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',

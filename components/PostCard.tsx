@@ -20,6 +20,21 @@ interface PostCardProps {
 }
 
 function PostCardInner({ post, activePostId }: PostCardProps) {
+  // ── Media URL resolution ────────────────────────────────────────────────────
+  // Priority 1: Reddit native video (is_video posts and cross-post previews)
+  const nativeVideoUrl =
+    post.secure_media?.reddit_video?.fallback_url ??
+    post.preview?.reddit_video_preview?.fallback_url ??
+    null;
+
+  // Priority 2: GIF/GIFV link posts (.gifv → .mp4 for Imgur's container format)
+  const rawUrl = post.url ?? '';
+  const isGif  = !post.is_video && /\.(gif|gifv)(\?.*)?$/i.test(rawUrl);
+  const gifUrl = isGif ? rawUrl.replace(/\.gifv$/i, '.mp4') : null;
+
+  const videoUrl  = nativeVideoUrl ?? gifUrl;
+  const showVideo = !!videoUrl;
+
   // Prefer a mid-res preview image; fall back down the resolution chain
   const imageUrl =
     post.preview?.images?.[0]?.resolutions?.[2]?.url?.replace(/&amp;/g, '&') ??
@@ -27,16 +42,6 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
     post.preview?.images?.[0]?.source?.url?.replace(/&amp;/g, '&') ??
     null;
 
-  // Detect GIF/GIFV posts by URL extension
-  const rawUrl = post.url ?? '';
-  const isGif =
-    !post.is_video &&
-    (/\.(gif|gifv)(\?.*)?$/i.test(rawUrl));
-
-  // Imgur .gifv container → serve the .mp4 equivalent directly
-  const videoUrl = isGif ? rawUrl.replace(/\.gifv$/i, '.mp4') : null;
-
-  const showVideo = !!videoUrl;
   const showImage =
     !showVideo &&
     !!imageUrl &&
@@ -44,13 +49,13 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
     post.thumbnail !== 'default' &&
     post.thumbnail !== 'nsfw';
 
-  // Selftext preview for text posts with no media
   const showSelftext =
     !showVideo &&
     !showImage &&
     !!post.selftext &&
     post.selftext.trim().length > 0;
 
+  // ── Navigation ──────────────────────────────────────────────────────────────
   function handlePress() {
     router.push({
       pathname: '/post/[id]',
@@ -75,18 +80,21 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
     });
   }
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <Pressable
       onPress={handlePress}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      // delayPressIn prevents the press state flickering during fast scrolls.
+      // No opacity change on press — visual feedback comes from android_ripple only.
       android_ripple={{ color: Colors.primaryMuted }}
+      style={styles.card}
     >
       {/* Title */}
       <Text style={styles.title}>
         {post.over_18 ? '[NSFW] ' : ''}{post.title}
       </Text>
 
-      {/* Main content: video > image > selftext excerpt */}
+      {/* Main content: native video > GIF video > image > selftext */}
       {showVideo ? (
         <Video
           source={{ uri: videoUrl! }}
@@ -116,7 +124,7 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
         <Pressable
           onPress={handlePress}
           hitSlop={10}
-          style={({ pressed }) => [styles.commentBtn, pressed && styles.commentBtnPressed]}
+          style={styles.commentBtn}
           accessibilityLabel={`Open comments (${post.num_comments})`}
           accessibilityRole="button"
         >
@@ -136,10 +144,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
-  },
-  cardPressed: {
-    opacity: 0.85,
-    backgroundColor: Colors.surfaceElevated,
   },
   title: {
     color: Colors.text,
@@ -175,8 +179,5 @@ const styles = StyleSheet.create({
   commentBtn: {
     padding: Spacing.xs,
     borderRadius: Radius.sm,
-  },
-  commentBtnPressed: {
-    opacity: 0.5,
   },
 });

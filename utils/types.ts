@@ -1,8 +1,8 @@
-// Type definitions for Reddit API responses
+﻿// Type definitions for Reddit API responses
 
 export interface RedditPost {
   id: string;
-  name: string;              // Reddit fullname, e.g. "t3_abc123" � pagination cursor
+  name: string;              // Reddit fullname, e.g. "t3_abc123" — pagination cursor
   title: string;
   author: string;
   subreddit: string;
@@ -17,7 +17,23 @@ export interface RedditPost {
       source: { url: string; width: number; height: number };
       resolutions: Array<{ url: string; width: number; height: number }>;
     }>;
+    /** Reddit-hosted GIF-to-video preview (cross-post / preview fallback) */
+    reddit_video_preview?: {
+      fallback_url: string;
+      height?: number;
+      width?: number;
+      is_gif?: boolean;
+    };
   };
+  /** Present on native Reddit video posts (is_video === true) */
+  secure_media?: {
+    reddit_video?: {
+      fallback_url: string;
+      height?: number;
+      width?: number;
+      is_gif?: boolean;
+    };
+  } | null;
   selftext: string;
   is_video: boolean;
   created_utc: number;

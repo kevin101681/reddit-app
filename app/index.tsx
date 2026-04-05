@@ -2,6 +2,7 @@
 import {
   ActionSheetIOS,
   Alert,
+  Animated,
   FlatList,
   Platform,
   Pressable,
@@ -23,7 +24,8 @@ import { getSortPreference, setSortPreference } from '../utils/storage';
 import { Colors, Spacing, Typography } from '../constants/theme';
 
 const SUBREDDIT = 'all';
-const BRAND = '#7ba0b3';
+const BRAND     = '#7ba0b3';
+const FAB_SIZE  = 56;
 
 const SORT_OPTIONS = [
   { label: 'Hot',           value: 'hot' },
@@ -32,35 +34,72 @@ const SORT_OPTIONS = [
   { label: 'Controversial', value: 'controversial' },
 ] as const;
 
-// Stable outside the component so FlatList never sees a new reference
-const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 70 };
-
 export default function FrontpageScreen() {
   const insets = useSafeAreaInsets();
 
-  const [sort, setSort] = useState('hot');
-  const [posts, setPosts] = useState<RedditPost[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [sort, setSort]           = useState('hot');
+  const [posts, setPosts]         = useState<RedditPost[]>([]);
+  const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [after, setAfter] = useState<string | undefined>(undefined);
-  const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [after, setAfter]         = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Load persisted sort on mount — if stored value equals default ('hot')
-  // React bails out of the re-render and no extra fetch occurs.
+  // ── Viewability — MUST be useRef so FlatList never sees a new reference ─────
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      setActivePostId(viewableItems[0]?.item?.id ?? null);
+    }
+  ).current;
+
+  // ── FAB hide-on-scroll ───────────────────────────────────────────────────────
+  const fabTranslateY = useRef(new Animated.Value(0)).current;
+  const isFabHidden   = useRef(false);
+  const lastScrollY   = useRef(0);
+
+  const handleScroll = useCallback(
+    (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+      const y  = e.nativeEvent.contentOffset.y;
+      const dy = y - lastScrollY.current;
+      lastScrollY.current = y;
+
+      if (Math.abs(dy) < 4) return;
+
+      if (dy > 0 && !isFabHidden.current) {
+        isFabHidden.current = true;
+        Animated.spring(fabTranslateY, {
+          toValue: FAB_SIZE + 32 + insets.bottom,
+          useNativeDriver: true,
+          damping: 20,
+          stiffness: 200,
+        }).start();
+      } else if (dy < 0 && isFabHidden.current) {
+        isFabHidden.current = false;
+        Animated.spring(fabTranslateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          damping: 20,
+          stiffness: 200,
+        }).start();
+      }
+    },
+    [insets.bottom, fabTranslateY]
+  );
+
+  // ── Sort ────────────────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
     getSortPreference().then((s) => { if (active) setSort(s); });
     return () => { active = false; };
   }, []);
 
-  // Persist and apply a new sort — state change propagates to fetchPosts
-  // via its dep list, which in turn triggers the reset effect below.
   const handleSortSelect = useCallback(async (newSort: string) => {
-    setSortPreference(newSort); // fire-and-forget
+    setSortPreference(newSort);
     setSort(newSort);
   }, []);
 
@@ -70,16 +109,8 @@ export default function FrontpageScreen() {
 
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        {
-          title: 'Sort by',
-          options: [...labels, 'Cancel'],
-          cancelButtonIndex: labels.length,
-        },
-        (index) => {
-          if (index < SORT_OPTIONS.length) {
-            handleSortSelect(SORT_OPTIONS[index].value);
-          }
-        }
+        { title: 'Sort by', options: [...labels, 'Cancel'], cancelButtonIndex: labels.length },
+        (i) => { if (i < SORT_OPTIONS.length) handleSortSelect(SORT_OPTIONS[i].value); }
       );
     } else {
       Alert.alert(
@@ -97,15 +128,7 @@ export default function FrontpageScreen() {
     }
   }
 
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      setActivePostId(viewableItems[0]?.item?.id ?? null);
-    },
-    []
-  );
-
-  // fetchPosts captures 'sort' in its closure. A new sort value creates a new
-  // function reference, which causes the reset effect below to fire.
+  // ── Data fetching ───────────────────────────────────────────────────────────
   const fetchPosts = useCallback(
     async (reset: boolean, cursor?: string) => {
       abortRef.current?.abort();
@@ -121,17 +144,12 @@ export default function FrontpageScreen() {
         setAfter(nextCursor ?? undefined);
         setHasMore(!!nextCursor && data.posts.length > 0);
       } catch (err: any) {
-        if (err?.name !== 'AbortError') {
-          setError(err?.message ?? 'Failed to load posts');
-        }
+        if (err?.name !== 'AbortError') setError(err?.message ?? 'Failed to load posts');
       }
     },
     [sort]
   );
 
-  // Fires on mount AND whenever fetchPosts changes (i.e. when sort changes).
-  // AbortController in fetchPosts ensures any in-flight request from the
-  // previous sort is cancelled before the new one starts.
   useEffect(() => {
     setLoading(true);
     setPosts([]);
@@ -164,7 +182,8 @@ export default function FrontpageScreen() {
     [activePostId]
   );
 
-  const footerHeight = 56 + Math.max(insets.bottom, Spacing.md);
+  // ── Render helpers ──────────────────────────────────────────────────────────
+  const fabPaddingBottom = Math.max(insets.bottom, Spacing.lg);
 
   const renderBody = () => {
     if (loading) {
@@ -192,7 +211,10 @@ export default function FrontpageScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         style={styles.fillContainer}
-        contentContainerStyle={[styles.listContent, { paddingBottom: footerHeight + Spacing.md }]}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: FAB_SIZE + fabPaddingBottom + Spacing.xl },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -204,8 +226,10 @@ export default function FrontpageScreen() {
         }
         onEndReached={onEndReached}
         onEndReachedThreshold={0.4}
-        viewabilityConfig={VIEWABILITY_CONFIG}
+        viewabilityConfig={viewabilityConfig}
         onViewableItemsChanged={onViewableItemsChanged}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         removeClippedSubviews
         initialNumToRender={10}
         maxToRenderPerBatch={10}
@@ -253,26 +277,26 @@ export default function FrontpageScreen() {
 
       <View style={styles.fillContainer}>{renderBody()}</View>
 
-      {/* Bottom footer: bookmarks menu button */}
-      <View
+      {/* Hide-on-scroll FAB — opens subreddit menu */}
+      <Animated.View
         style={[
-          styles.footer,
+          styles.fab,
           {
-            height: footerHeight,
-            paddingBottom: Math.max(insets.bottom, Spacing.md),
+            bottom: fabPaddingBottom + Spacing.lg,
+            transform: [{ translateY: fabTranslateY }],
           },
         ]}
+        pointerEvents="box-none"
       >
         <Pressable
-          style={({ pressed }) => [styles.menuBtn, pressed && styles.menuBtnPressed]}
           onPress={() => router.push('/menu')}
-          hitSlop={8}
+          style={({ pressed }) => [styles.fabBtn, pressed && styles.fabBtnPressed]}
           accessibilityLabel="Open subreddit menu"
           accessibilityRole="button"
         >
-          <MaterialIcons name="bookmarks" size={26} color={BRAND} />
+          <MaterialIcons name="explore" size={26} color="#fff" />
         </Pressable>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -319,33 +343,28 @@ const styles = StyleSheet.create({
   },
   errorBannerText: { color: Colors.textMuted, fontSize: Typography.sm },
   loadingMore: { paddingVertical: Spacing.xl },
-
   headerBtn: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: 6,
   },
   headerBtnPressed: { opacity: 0.5 },
-
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-end',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.sm,
-    backgroundColor: Colors.surface,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
+  fab: {
+    position: 'absolute',
+    right: Spacing.lg,
   },
-  menuBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  fabBtn: {
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
+    backgroundColor: BRAND,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surfaceElevated,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: 5,
   },
-  menuBtnPressed: {
-    opacity: 0.6,
-  },
+  fabBtnPressed: { opacity: 0.85 },
 });

@@ -2,35 +2,35 @@
 import { View, Text, Pressable, StyleSheet, Linking } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { RedditComment } from '../utils/types';
-import { formatRelativeTime } from '../utils/api';
 import { buildMarkdownStyles, suppressImageRule } from '../utils/markdownStyles';
 import { Colors, Spacing, Typography } from '../constants/theme';
 
 const BRAND = '#7ba0b3';
 
-// One distinct color per nesting depth — cycles after 6 levels
+// One distinct border color per nesting depth — cycles after 6 levels
 const DEPTH_COLORS = [
   Colors.primary,  // 0 — orange
   '#7193ff',       // 1 — periwinkle
   '#46d160',       // 2 — green
   '#ffd635',       // 3 — gold
   '#ff585b',       // 4 — coral
-  '#00b4d8',       // 5 — teal (wraps back to orange at 6)
+  '#00b4d8',       // 5 — teal
 ];
 
 function depthColor(depth: number): string {
   return DEPTH_COLORS[depth % DEPTH_COLORS.length];
 }
 
-/** All links open externally in the device browser. */
+/** All tapped links open externally in the device browser. */
 function openLink(url: string): boolean {
   Linking.openURL(url).catch(() => {});
   return true;
 }
 
 /**
- * Memoised markdown styles per depth.
- * Font size shrinks slightly at deeper nesting to fit narrow columns.
+ * Memoised markdown styles per nesting depth.
+ * Font size shrinks slightly at deeper levels so text stays readable
+ * inside narrow indented columns.
  */
 function useCommentMdStyles(depth: number) {
   return useMemo(() => {
@@ -52,7 +52,7 @@ export const CommentThread = memo(function CommentThread({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const mdStyles = useCommentMdStyles(depth);
 
-  // Skip deleted / removed comments entirely
+  // Skip deleted / removed bodies entirely
   if (
     !comment.body ||
     comment.body === '[deleted]' ||
@@ -64,63 +64,49 @@ export const CommentThread = memo(function CommentThread({
   const color      = depthColor(depth);
   const replyCount = comment.replies?.length ?? 0;
 
-  // Nesting is conveyed by a thick coloured left border + a single
-  // paddingLeft step. No marginLeft stacking — each level only adds 8 px,
-  // so deeply nested comments never get squished off-screen.
+  // Each nesting level adds a coloured left border + a single paddingLeft step.
+  // No marginLeft stacking — cumulative indent stays proportional and never
+  // pushes deeply-nested text off-screen.
   const nestedStyle = depth > 0
-    ? {
-        borderLeftWidth: 3,
-        borderLeftColor: color,
-        paddingLeft: Spacing.sm,
-      }
+    ? { borderLeftWidth: 3, borderLeftColor: color, paddingLeft: Spacing.sm }
     : undefined;
 
   return (
     <View style={[styles.container, nestedStyle]}>
 
-      {/* ── Meta row — always rendered ─────────────────────────────────── */}
-      <Pressable
-        onPress={() => setIsCollapsed((c) => !c)}
-        style={({ pressed }) => [styles.header, pressed && styles.headerPressed]}
-        hitSlop={4}
-        accessibilityRole="button"
-        accessibilityLabel={isCollapsed ? 'Expand comment' : 'Collapse comment'}
-      >
-        <View style={styles.metaRow}>
-          {/* Bold brand username */}
-          <Text style={styles.author}>{comment.author}</Text>
-
-          {/* Score intentionally hidden — muted mid-dot separator */}
-          <Text style={styles.metaMuted}>{' \u2022 [score hidden] \u2022 '}</Text>
-
-          {/* Relative time */}
-          <Text style={styles.metaMuted}>
-            {formatRelativeTime(comment.created_utc)}
-          </Text>
-
-          {/* Collapsed indicator */}
-          {isCollapsed && (
-            <Text style={styles.collapsedHint}>{' [+]'}</Text>
-          )}
-        </View>
-      </Pressable>
-
-      {/* ── Body + replies — hidden when collapsed ──────────────────────── */}
-      {!isCollapsed && (
+      {isCollapsed ? (
+        // ── Collapsed: tap the placeholder to expand ──────────────────────────
+        <Pressable
+          onPress={() => setIsCollapsed(false)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Expand comment"
+        >
+          <Text style={styles.collapsedPlaceholder}>[+]</Text>
+        </Pressable>
+      ) : (
+        // ── Expanded: tap the body to collapse ───────────────────────────────
         <>
-          {/*
-            flex: 1 / flexShrink: 1 together prevent horizontal overflow
-            inside deeply indented columns.
-          */}
-          <View style={styles.bodyWrap}>
-            <Markdown
-              style={mdStyles}
-              onLinkPress={openLink}
-              rules={suppressImageRule}
-            >
-              {comment.body}
-            </Markdown>
-          </View>
+          <Pressable
+            onPress={() => setIsCollapsed(true)}
+            hitSlop={4}
+            accessibilityRole="button"
+            accessibilityLabel="Collapse comment"
+          >
+            {/*
+              flex: 1 / flexShrink: 1 prevent horizontal overflow inside
+              deeply indented columns where available width is narrow.
+            */}
+            <View style={styles.bodyWrap}>
+              <Markdown
+                style={mdStyles}
+                onLinkPress={openLink}
+                rules={suppressImageRule}
+              >
+                {comment.body}
+              </Markdown>
+            </View>
+          </Pressable>
 
           {replyCount > 0 && (
             <View style={styles.replies}>
@@ -144,37 +130,16 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     paddingTop: Spacing.xs,
   },
-  header: {
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  headerPressed: { opacity: 0.6 },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  // Bold, brand-coloured username
-  author: {
+  // Tiny tappable target shown when the thread is collapsed
+  collapsedPlaceholder: {
     color: BRAND,
     fontSize: Typography.xs,
     fontWeight: '700',
-  },
-  // "[score hidden]" and relative time — small, muted
-  metaMuted: {
-    color: Colors.textMuted,
-    fontSize: Typography.xs,
-  },
-  // [+] shown only when collapsed
-  collapsedHint: {
-    color: Colors.textDisabled,
-    fontSize: Typography.xs,
-    fontStyle: 'italic',
+    paddingVertical: 8,
   },
   bodyWrap: {
     flex: 1,
     flexShrink: 1,
-    marginTop: Spacing.xs,
     marginBottom: Spacing.xs,
   },
   replies: {

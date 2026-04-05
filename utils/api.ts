@@ -1,4 +1,4 @@
-import { RedditPost, RedditComment, PostsResponse, CommentsResponse } from './types';
+﻿import { RedditPost, RedditComment, PostsResponse, CommentsResponse } from './types';
 
 const REDDIT_BASE = 'https://www.reddit.com';
 
@@ -8,7 +8,7 @@ const REDDIT_BASE = 'https://www.reddit.com';
  */
 const USER_AGENT = 'android:com.personal.redditapp:v1.0.0 (by /u/kevin101681)';
 
-// --- Core fetch --------------------------------------------------------------
+// ─── Core fetch ───────────────────────────────────────────────────────────────
 
 async function redditFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, {
@@ -24,7 +24,15 @@ async function redditFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-// --- Post normalizer ----------------------------------------------------------
+// ─── Filters ──────────────────────────────────────────────────────────────────
+
+/** Returns true for children that should be silently dropped from any listing. */
+function isBotChild(child: any): boolean {
+  const author: string = child?.data?.author ?? '';
+  return author.toLowerCase() === 'automoderator';
+}
+
+// ─── Post normalizer ──────────────────────────────────────────────────────────
 
 function normalizePost(child: any): RedditPost | null {
   if (child.kind !== 't3') return null;
@@ -42,6 +50,7 @@ function normalizePost(child: any): RedditPost | null {
     permalink:               d.permalink  ?? '',
     thumbnail:               d.thumbnail  ?? '',
     preview:                 d.preview,
+    secure_media:            d.secure_media ?? null,
     selftext:                d.selftext   ?? '',
     is_video:                d.is_video   ?? false,
     created_utc:             d.created_utc ?? 0,
@@ -52,20 +61,21 @@ function normalizePost(child: any): RedditPost | null {
   };
 }
 
-// --- Comment normalizer (recursive) ------------------------------------------
+// ─── Comment normalizer (recursive) ──────────────────────────────────────────
 
 function normalizeComment(child: any, depth = 0): RedditComment | null {
-  // Filter out "more" sentinel nodes � these are lazy-load placeholders
-  // that have no body and would crash the comment tree renderer.
+  // Filter out "more" sentinel nodes and bot authors at every level
   if (!child || child.kind === 'more' || child.kind !== 't1') return null;
+  if (isBotChild(child)) return null;
 
   const d = child.data;
 
-  // Recurse into nested replies, dropping more-nodes at every level
+  // Recurse into nested replies, dropping more-nodes and bots at every level
   let replies: RedditComment[] = [];
   if (d.replies && typeof d.replies === 'object') {
     const replyChildren: any[] = d.replies?.data?.children ?? [];
     replies = replyChildren
+      .filter((c: any) => !isBotChild(c))
       .map((c: any) => normalizeComment(c, depth + 1))
       .filter((c): c is RedditComment => c !== null);
   }
@@ -81,7 +91,7 @@ function normalizeComment(child: any, depth = 0): RedditComment | null {
   };
 }
 
-// --- Public API ---------------------------------------------------------------
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * Fetch a page of posts directly from Reddit.
@@ -100,6 +110,7 @@ export async function getPosts(
   const raw = await redditFetch<any>(url, signal);
 
   const posts = (raw?.data?.children ?? [])
+    .filter((c: any) => !isBotChild(c))
     .map(normalizePost)
     .filter((p: RedditPost | null): p is RedditPost => p !== null);
 
@@ -123,25 +134,26 @@ export async function getComments(
   const commentChildren: any[] = raw?.[1]?.data?.children ?? [];
 
   const comments = commentChildren
+    .filter((c: any) => !isBotChild(c))
     .map((c: any) => normalizeComment(c, 0))
     .filter((c): c is RedditComment => c !== null);
 
   return { comments };
 }
 
-// --- Utilities ----------------------------------------------------------------
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
 /** Format a Unix timestamp into a relative time string */
 export function formatRelativeTime(utc: number): string {
   const diff = Math.floor(Date.now() / 1000) - utc;
-  if (diff < 60)    return `${diff}s`;
-  if (diff < 3600)  return `${Math.floor(diff / 60)}m`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  if (diff < 60)     return `${diff}s`;
+  if (diff < 3600)   return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400)  return `${Math.floor(diff / 3600)}h`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
   return `${Math.floor(diff / 604800)}w`;
 }
 
-/** Compact number formatting: 1200 ? "1.2k" */
+/** Compact number formatting: 1200 → "1.2k" */
 export function formatScore(score: number): string {
   if (score >= 1_000_000) return `${(score / 1_000_000).toFixed(1)}m`;
   if (score >= 1_000)     return `${(score / 1_000).toFixed(1)}k`;
