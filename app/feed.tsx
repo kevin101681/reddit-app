@@ -7,6 +7,7 @@ import {
   View,
   ActivityIndicator,
   Pressable,
+  ViewToken,
 } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { getPosts } from '../utils/api';
@@ -17,6 +18,10 @@ import { getFavorites, addFavorite, removeFavorite } from '../utils/storage';
 import { Colors, Spacing, Typography } from '../constants/theme';
 
 const SORT = 'hot';
+const BRAND = '#7ba0b3';
+
+// Stable outside the component — FlatList requires a non-changing reference
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 70 };
 
 export default function FeedScreen() {
   const { subreddit } = useLocalSearchParams<{ subreddit: string }>();
@@ -30,12 +35,12 @@ export default function FeedScreen() {
   const [after, setAfter] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activePostId, setActivePostId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   // Favourite state
   const [isFavorited, setIsFavorited] = useState(false);
 
-  // Check persisted favourite status whenever the subreddit changes
   useEffect(() => {
     let cancelled = false;
     getFavorites().then((favs) => {
@@ -54,7 +59,14 @@ export default function FeedScreen() {
     }
   }
 
-  // Feed fetching
+  // setActivePostId is stable — empty deps are safe here
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      setActivePostId(viewableItems[0]?.item?.id ?? null);
+    },
+    []
+  );
+
   const fetchPosts = useCallback(
     async (reset: boolean, cursor?: string) => {
       abortRef.current?.abort();
@@ -83,6 +95,7 @@ export default function FeedScreen() {
     setPosts([]);
     setAfter(undefined);
     setHasMore(true);
+    setActivePostId(null);
     fetchPosts(true).finally(() => setLoading(false));
     return () => abortRef.current?.abort();
   }, [sub]);
@@ -101,6 +114,13 @@ export default function FeedScreen() {
     await fetchPosts(false, after);
     setLoadingMore(false);
   }, [loadingMore, hasMore, after, fetchPosts]);
+
+  const renderItem = useCallback(
+    ({ item }: { item: RedditPost }) => (
+      <PostCard post={item} activePostId={activePostId} />
+    ),
+    [activePostId]
+  );
 
   return (
     <>
@@ -127,7 +147,7 @@ export default function FeedScreen() {
         </View>
       ) : error && posts.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.errorIcon}>??</Text>
+          <Text style={styles.errorIcon}>⚠️</Text>
           <Text style={styles.errorTitle}>Could not load r/{sub}</Text>
           <Text style={styles.errorMessage}>{error}</Text>
           <Text style={styles.retryHint}>Pull down to retry</Text>
@@ -136,30 +156,36 @@ export default function FeedScreen() {
         <FlatList
           data={posts}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <PostCard post={item} />}
+          renderItem={renderItem}
           style={styles.container}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={Colors.primary}
-              colors={[Colors.primary]}
+              tintColor={BRAND}
+              colors={[BRAND]}
               progressBackgroundColor={Colors.surface}
             />
           }
           onEndReached={onEndReached}
           onEndReachedThreshold={0.4}
+          viewabilityConfig={VIEWABILITY_CONFIG}
+          onViewableItemsChanged={onViewableItemsChanged}
+          removeClippedSubviews
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={11}
           ListHeaderComponent={
             error ? (
               <View style={styles.errorBanner}>
-                <Text style={styles.errorBannerText}>?? {error}</Text>
+                <Text style={styles.errorBannerText}>⚠️ {error}</Text>
               </View>
             ) : null
           }
           ListFooterComponent={
             loadingMore ? (
-              <ActivityIndicator color={Colors.primary} style={styles.loadingMore} />
+              <ActivityIndicator color={BRAND} style={styles.loadingMore} />
             ) : null
           }
         />
@@ -201,6 +227,6 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   starIconFilled: {
-    color: '#7ba0b3',
+    color: BRAND,
   },
 });

@@ -7,7 +7,7 @@ import {
   View,
   ActivityIndicator,
   Pressable,
-  Platform,
+  ViewToken,
 } from 'react-native';
 import { router, Stack } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -22,6 +22,9 @@ const SUBREDDIT = 'all';
 const SORT = 'hot';
 const BRAND = '#7ba0b3';
 
+// Stable outside the component so FlatList never sees a new reference
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 70 };
+
 export default function FrontpageScreen() {
   const insets = useSafeAreaInsets();
 
@@ -32,7 +35,17 @@ export default function FrontpageScreen() {
   const [after, setAfter] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activePostId, setActivePostId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // setActivePostId is stable, so this callback can have empty deps and
+  // will never change reference — safe to pass directly to FlatList.
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      setActivePostId(viewableItems[0]?.item?.id ?? null);
+    },
+    []
+  );
 
   const fetchPosts = useCallback(async (reset: boolean, cursor?: string) => {
     abortRef.current?.abort();
@@ -74,6 +87,13 @@ export default function FrontpageScreen() {
     setLoadingMore(false);
   }, [loadingMore, hasMore, after, fetchPosts]);
 
+  const renderItem = useCallback(
+    ({ item }: { item: RedditPost }) => (
+      <PostCard post={item} activePostId={activePostId} />
+    ),
+    [activePostId]
+  );
+
   const footerHeight = 56 + Math.max(insets.bottom, Spacing.md);
 
   const renderBody = () => {
@@ -100,7 +120,7 @@ export default function FrontpageScreen() {
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <PostCard post={item} />}
+        renderItem={renderItem}
         style={styles.fillContainer}
         contentContainerStyle={[styles.listContent, { paddingBottom: footerHeight + Spacing.md }]}
         refreshControl={
@@ -114,6 +134,8 @@ export default function FrontpageScreen() {
         }
         onEndReached={onEndReached}
         onEndReachedThreshold={0.4}
+        viewabilityConfig={VIEWABILITY_CONFIG}
+        onViewableItemsChanged={onViewableItemsChanged}
         removeClippedSubviews
         initialNumToRender={10}
         maxToRenderPerBatch={10}

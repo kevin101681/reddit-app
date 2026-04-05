@@ -1,4 +1,4 @@
-import React from 'react';
+ï»¿import React, { memo } from 'react';
 import {
   View,
   Text,
@@ -6,32 +6,52 @@ import {
   Image,
   StyleSheet,
 } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import { router } from 'expo-router';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { RedditPost } from '../utils/types';
-import { formatRelativeTime, formatScore } from '../utils/api';
 import { Colors, Spacing, Typography, Radius } from '../constants/theme';
+
+const BRAND = '#7ba0b3';
 
 interface PostCardProps {
   post: RedditPost;
+  activePostId?: string | null;
 }
 
-export function PostCard({ post }: PostCardProps) {
-  // Prefer a mid-res preview; fall back to source; null if none available
+function PostCardInner({ post, activePostId }: PostCardProps) {
+  // Prefer a mid-res preview image; fall back down the resolution chain
   const imageUrl =
     post.preview?.images?.[0]?.resolutions?.[2]?.url?.replace(/&amp;/g, '&') ??
     post.preview?.images?.[0]?.resolutions?.[1]?.url?.replace(/&amp;/g, '&') ??
     post.preview?.images?.[0]?.source?.url?.replace(/&amp;/g, '&') ??
     null;
 
+  // Detect GIF/GIFV posts by URL extension
+  const rawUrl = post.url ?? '';
+  const isGif =
+    !post.is_video &&
+    (/\.(gif|gifv)(\?.*)?$/i.test(rawUrl));
+
+  // Imgur's .gifv container â†’ serve the .mp4 equivalent directly
+  const videoUrl = isGif ? rawUrl.replace(/\.gifv$/i, '.mp4') : null;
+
+  const showVideo = !!videoUrl;
   const showImage =
+    !showVideo &&
     !!imageUrl &&
     post.thumbnail !== 'self' &&
     post.thumbnail !== 'default' &&
     post.thumbnail !== 'nsfw';
 
+  // Selftext preview for link-free text posts with no media
+  const showSelftext =
+    !showVideo &&
+    !showImage &&
+    !!post.selftext &&
+    post.selftext.trim().length > 0;
+
   function handlePress() {
-    // Forward the full post payload as string params so [id].tsx can
-    // render the post header instantly, before the comments fetch resolves.
     router.push({
       pathname: '/post/[id]',
       params: {
@@ -60,57 +80,53 @@ export function PostCard({ post }: PostCardProps) {
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       android_ripple={{ color: Colors.primaryMuted }}
     >
-      {/* Subreddit + meta */}
-      <View style={styles.metaRow}>
+      {/* Title */}
+      <Text style={styles.title}>
+        {post.over_18 ? '[NSFW] ' : ''}{post.title}
+      </Text>
+
+      {/* Main content: video > image > selftext excerpt */}
+      {showVideo ? (
+        <Video
+          source={{ uri: videoUrl! }}
+          style={styles.media}
+          shouldPlay={activePostId === post.id}
+          isLooping
+          isMuted
+          resizeMode={ResizeMode.COVER}
+        />
+      ) : showImage ? (
+        <Image
+          source={{ uri: imageUrl! }}
+          style={styles.media}
+          resizeMode="cover"
+        />
+      ) : showSelftext ? (
+        <Text style={styles.selftext} numberOfLines={3}>
+          {post.selftext.trim()}
+        </Text>
+      ) : null}
+
+      {/* Footer: subreddit left, comment icon right */}
+      <View style={styles.footer}>
         <Text style={styles.subreddit} numberOfLines={1}>
           {post.subreddit_name_prefixed}
         </Text>
-        <Text style={styles.dot}> · </Text>
-        <Text style={styles.meta}>{formatRelativeTime(post.created_utc)}</Text>
-        <Text style={styles.dot}> · </Text>
-        <Text style={styles.meta} numberOfLines={1}>u/{post.author}</Text>
-      </View>
-
-      {/* Flair */}
-      {post.flair_text ? (
-        <View style={styles.flairBadge}>
-          <Text style={styles.flairText} numberOfLines={1}>{post.flair_text}</Text>
-        </View>
-      ) : null}
-
-      {/* Title */}
-      <Text style={styles.title} numberOfLines={4}>
-        {post.over_18 ? '?? ' : ''}{post.title}
-      </Text>
-
-      {/* Preview image */}
-      {showImage ? (
-        <Image
-          source={{ uri: imageUrl! }}
-          style={styles.previewImage}
-          resizeMode="cover"
-        />
-      ) : null}
-
-      {/* Read-only stats */}
-      <View style={styles.statsRow}>
-        <View style={styles.statChip}>
-          <Text style={styles.statChipText}>{formatScore(post.score)} pts</Text>
-        </View>
-        <View style={[styles.statChip, styles.statChipSecondary]}>
-          <Text style={styles.statChipSecondaryText}>
-            {formatScore(post.num_comments)} comments
-          </Text>
-        </View>
-        {post.is_video ? (
-          <View style={[styles.statChip, styles.tagChip]}>
-            <Text style={styles.tagText}>VIDEO</Text>
-          </View>
-        ) : null}
+        <Pressable
+          onPress={handlePress}
+          hitSlop={10}
+          style={({ pressed }) => [styles.commentBtn, pressed && styles.commentBtnPressed]}
+          accessibilityLabel={`Open comments (${post.num_comments})`}
+          accessibilityRole="button"
+        >
+          <MaterialIcons name="chat-bubble-outline" size={20} color={BRAND} />
+        </Pressable>
       </View>
     </Pressable>
   );
 }
+
+export const PostCard = memo(PostCardInner);
 
 const styles = StyleSheet.create({
   card: {
@@ -120,25 +136,10 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     padding: Spacing.lg,
   },
-  cardPressed: { opacity: 0.85, backgroundColor: Colors.surfaceElevated },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    marginBottom: Spacing.xs,
+  cardPressed: {
+    opacity: 0.85,
+    backgroundColor: Colors.surfaceElevated,
   },
-  subreddit: { color: Colors.primary, fontSize: Typography.xs, fontWeight: '700' },
-  dot: { color: Colors.textDisabled, fontSize: Typography.xs },
-  meta: { color: Colors.textMuted, fontSize: Typography.xs, flexShrink: 1 },
-  flairBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.primaryMuted,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    marginBottom: Spacing.xs,
-  },
-  flairText: { color: Colors.primary, fontSize: Typography.xs, fontWeight: '600' },
   title: {
     color: Colors.text,
     fontSize: Typography.md,
@@ -146,28 +147,35 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: Spacing.sm,
   },
-  previewImage: {
+  media: {
     width: '100%',
-    height: 200,
+    height: 220,
     borderRadius: Radius.md,
     marginBottom: Spacing.sm,
     backgroundColor: Colors.border,
   },
-  statsRow: {
+  selftext: {
+    color: Colors.textMuted,
+    fontSize: Typography.sm,
+    lineHeight: 19,
+    marginBottom: Spacing.sm,
+  },
+  footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
     marginTop: Spacing.xs,
   },
-  statChip: {
-    backgroundColor: Colors.primaryMuted,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
+  subreddit: {
+    flex: 1,
+    color: Colors.brand,
+    fontSize: Typography.xs,
+    fontWeight: '700',
   },
-  statChipText: { color: Colors.primary, fontSize: Typography.xs, fontWeight: '700' },
-  statChipSecondary: { backgroundColor: Colors.surfaceElevated },
-  statChipSecondaryText: { color: Colors.textMuted, fontSize: Typography.xs, fontWeight: '600' },
-  tagChip: { backgroundColor: Colors.border, marginLeft: 'auto' },
-  tagText: { color: Colors.textMuted, fontSize: Typography.xs, fontWeight: '700', letterSpacing: 0.5 },
+  commentBtn: {
+    padding: Spacing.xs,
+    borderRadius: Radius.sm,
+  },
+  commentBtnPressed: {
+    opacity: 0.5,
+  },
 });
