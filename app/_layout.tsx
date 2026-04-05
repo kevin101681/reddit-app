@@ -1,7 +1,11 @@
-﻿import { Platform } from 'react-native';
+﻿import { Platform, UIManager } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '../constants/theme';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export default function RootLayout() {
   return (
