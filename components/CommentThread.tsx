@@ -1,5 +1,5 @@
 ﻿import React, { memo, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Linking } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Linking, LayoutAnimation } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { RedditComment } from '../utils/types';
 import { buildMarkdownStyles, suppressImageRule } from '../utils/markdownStyles';
@@ -77,7 +77,10 @@ export const CommentThread = memo(function CommentThread({
       {isCollapsed ? (
         // ── Collapsed: tap the placeholder to expand ──────────────────────────
         <Pressable
-          onPress={() => setIsCollapsed(false)}
+          onPress={() => {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setIsCollapsed(false);
+          }}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="Expand comment"
@@ -85,26 +88,31 @@ export const CommentThread = memo(function CommentThread({
           <Text style={styles.collapsedPlaceholder}>[+]</Text>
         </Pressable>
       ) : (
-        // ── Expanded: tap the body to collapse ───────────────────────────────
+        // ── Expanded: tap the card to collapse ───────────────────────────────
         <>
           <Pressable
-            onPress={() => setIsCollapsed(true)}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setIsCollapsed(true);
+            }}
             hitSlop={4}
             accessibilityRole="button"
             accessibilityLabel="Collapse comment"
           >
             {/*
-              flex: 1 / flexShrink: 1 prevent horizontal overflow inside
-              deeply indented columns where available width is narrow.
+              Material 3 card wraps the text content; the depth border
+              stays on the outer container so cards visually step inward.
             */}
-            <View style={styles.bodyWrap}>
-              <Markdown
-                style={mdStyles}
-                onLinkPress={openLink}
-                rules={suppressImageRule}
-              >
-                {comment.body}
-              </Markdown>
+            <View style={styles.card}>
+              <View style={styles.bodyWrap}>
+                <Markdown
+                  style={mdStyles}
+                  onLinkPress={openLink}
+                  rules={suppressImageRule}
+                >
+                  {comment.body}
+                </Markdown>
+              </View>
             </View>
           </Pressable>
 
@@ -137,10 +145,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     paddingVertical: 8,
   },
+  card: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+  },
   bodyWrap: {
     flex: 1,
     flexShrink: 1,
-    marginBottom: Spacing.xs,
   },
   replies: {
     marginTop: Spacing.xs,
