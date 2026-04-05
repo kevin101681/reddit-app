@@ -1,24 +1,34 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActionSheetIOS,
+  Alert,
   FlatList,
+  Platform,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
-  ActivityIndicator,
-  Pressable,
   ViewToken,
+  ActivityIndicator,
 } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { getPosts } from '../utils/api';
 import { RedditPost } from '../utils/types';
 import { PostCard } from '../components/PostCard';
 import { FeedSkeleton } from '../components/SkeletonLoader';
-import { getFavorites, addFavorite, removeFavorite } from '../utils/storage';
+import { getFavorites, addFavorite, removeFavorite, getSortPreference, setSortPreference } from '../utils/storage';
 import { Colors, Spacing, Typography } from '../constants/theme';
 
-const SORT = 'hot';
 const BRAND = '#7ba0b3';
+
+const SORT_OPTIONS = [
+  { label: 'Hot',           value: 'hot' },
+  { label: 'New',           value: 'new' },
+  { label: 'Top',           value: 'top' },
+  { label: 'Controversial', value: 'controversial' },
+] as const;
 
 // Stable outside the component — FlatList requires a non-changing reference
 const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 70 };
@@ -26,6 +36,53 @@ const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 70 };
 export default function FeedScreen() {
   const { subreddit } = useLocalSearchParams<{ subreddit: string }>();
   const sub = (Array.isArray(subreddit) ? subreddit[0] : subreddit) ?? 'popular';
+
+  // Sort preference — loaded from storage on mount
+  const [sort, setSort] = useState('hot');
+
+  useEffect(() => {
+    let active = true;
+    getSortPreference().then((s) => { if (active) setSort(s); });
+    return () => { active = false; };
+  }, []);
+
+  const handleSortSelect = useCallback(async (newSort: string) => {
+    setSortPreference(newSort); // fire-and-forget
+    setSort(newSort);
+  }, []);
+
+  function openSortPicker() {
+    const labels  = SORT_OPTIONS.map((o) => o.label);
+    const current = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? 'Hot';
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: 'Sort by',
+          options: [...labels, 'Cancel'],
+          cancelButtonIndex: labels.length,
+        },
+        (index) => {
+          if (index < SORT_OPTIONS.length) {
+            handleSortSelect(SORT_OPTIONS[index].value);
+          }
+        }
+      );
+    } else {
+      Alert.alert(
+        'Sort by',
+        `Currently: ${current}`,
+        [
+          ...SORT_OPTIONS.map((o) => ({
+            text: o.value === sort ? `${o.label} ✓` : o.label,
+            onPress: () => handleSortSelect(o.value),
+          })),
+          { text: 'Cancel', style: 'cancel' as const },
+        ],
+        { cancelable: true }
+      );
+    }
+  }
 
   // Feed state
   const [posts, setPosts] = useState<RedditPost[]>([]);
@@ -59,7 +116,6 @@ export default function FeedScreen() {
     }
   }
 
-  // setActivePostId is stable — empty deps are safe here
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       setActivePostId(viewableItems[0]?.item?.id ?? null);
@@ -67,6 +123,8 @@ export default function FeedScreen() {
     []
   );
 
+  // fetchPosts captures both 'sub' and 'sort'. A new function reference is
+  // created whenever either changes, triggering the reset effect below.
   const fetchPosts = useCallback(
     async (reset: boolean, cursor?: string) => {
       abortRef.current?.abort();
@@ -75,7 +133,7 @@ export default function FeedScreen() {
 
       try {
         setError(null);
-        const data = await getPosts(sub, SORT, cursor, controller.signal);
+        const data = await getPosts(sub, sort, cursor, controller.signal);
         setPosts((prev) => (reset ? data.posts : [...prev, ...data.posts]));
         const nextCursor =
           data.after ?? (data.posts.length ? data.posts[data.posts.length - 1].name : undefined);
@@ -87,9 +145,10 @@ export default function FeedScreen() {
         }
       }
     },
-    [sub]
+    [sub, sort]
   );
 
+  // Fires whenever fetchPosts changes — covers both subreddit AND sort changes.
   useEffect(() => {
     setLoading(true);
     setPosts([]);
@@ -98,7 +157,7 @@ export default function FeedScreen() {
     setActivePostId(null);
     fetchPosts(true).finally(() => setLoading(false));
     return () => abortRef.current?.abort();
-  }, [sub]);
+  }, [fetchPosts]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -122,21 +181,39 @@ export default function FeedScreen() {
     [activePostId]
   );
 
+  const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? 'Hot';
+
   return (
     <>
       <Stack.Screen
         options={{
           title: `r/${sub}`,
           headerRight: () => (
-            <Pressable
-              onPress={toggleFavorite}
-              style={({ pressed }) => [styles.starBtn, pressed && styles.starBtnPressed]}
-              hitSlop={8}
-            >
-              <Text style={[styles.starIcon, isFavorited && styles.starIconFilled]}>
-                {isFavorited ? '\u2605' : '\u2606'}
-              </Text>
-            </Pressable>
+            <View style={styles.headerRight}>
+              {/* Sort picker */}
+              <Pressable
+                onPress={openSortPicker}
+                style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+                hitSlop={8}
+                accessibilityLabel={`Sort: ${sortLabel}`}
+                accessibilityRole="button"
+              >
+                <MaterialIcons name="filter-list" size={24} color={BRAND} />
+              </Pressable>
+
+              {/* Favourite star */}
+              <Pressable
+                onPress={toggleFavorite}
+                style={({ pressed }) => [styles.starBtn, pressed && styles.starBtnPressed]}
+                hitSlop={8}
+                accessibilityLabel={isFavorited ? 'Remove from favourites' : 'Add to favourites'}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.starIcon, isFavorited && styles.starIconFilled]}>
+                  {isFavorited ? '\u2605' : '\u2606'}
+                </Text>
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -217,6 +294,18 @@ const styles = StyleSheet.create({
   },
   errorBannerText: { color: Colors.textMuted, fontSize: Typography.sm },
   loadingMore: { paddingVertical: Spacing.xl },
+
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  headerBtn: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  headerBtnPressed: { opacity: 0.5 },
   starBtn: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,

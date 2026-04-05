@@ -1,13 +1,16 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActionSheetIOS,
+  Alert,
   FlatList,
+  Platform,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
-  ActivityIndicator,
-  Pressable,
   ViewToken,
+  ActivityIndicator,
 } from 'react-native';
 import { router, Stack } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -16,11 +19,18 @@ import { getPosts } from '../utils/api';
 import { RedditPost } from '../utils/types';
 import { PostCard } from '../components/PostCard';
 import { FeedSkeleton } from '../components/SkeletonLoader';
+import { getSortPreference, setSortPreference } from '../utils/storage';
 import { Colors, Spacing, Typography } from '../constants/theme';
 
 const SUBREDDIT = 'all';
-const SORT = 'hot';
 const BRAND = '#7ba0b3';
+
+const SORT_OPTIONS = [
+  { label: 'Hot',           value: 'hot' },
+  { label: 'New',           value: 'new' },
+  { label: 'Top',           value: 'top' },
+  { label: 'Controversial', value: 'controversial' },
+] as const;
 
 // Stable outside the component so FlatList never sees a new reference
 const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 70 };
@@ -28,6 +38,7 @@ const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 70 };
 export default function FrontpageScreen() {
   const insets = useSafeAreaInsets();
 
+  const [sort, setSort] = useState('hot');
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,8 +49,54 @@ export default function FrontpageScreen() {
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // setActivePostId is stable, so this callback can have empty deps and
-  // will never change reference — safe to pass directly to FlatList.
+  // Load persisted sort on mount — if stored value equals default ('hot')
+  // React bails out of the re-render and no extra fetch occurs.
+  useEffect(() => {
+    let active = true;
+    getSortPreference().then((s) => { if (active) setSort(s); });
+    return () => { active = false; };
+  }, []);
+
+  // Persist and apply a new sort — state change propagates to fetchPosts
+  // via its dep list, which in turn triggers the reset effect below.
+  const handleSortSelect = useCallback(async (newSort: string) => {
+    setSortPreference(newSort); // fire-and-forget
+    setSort(newSort);
+  }, []);
+
+  function openSortPicker() {
+    const labels  = SORT_OPTIONS.map((o) => o.label);
+    const current = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? 'Hot';
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: 'Sort by',
+          options: [...labels, 'Cancel'],
+          cancelButtonIndex: labels.length,
+        },
+        (index) => {
+          if (index < SORT_OPTIONS.length) {
+            handleSortSelect(SORT_OPTIONS[index].value);
+          }
+        }
+      );
+    } else {
+      Alert.alert(
+        'Sort by',
+        `Currently: ${current}`,
+        [
+          ...SORT_OPTIONS.map((o) => ({
+            text: o.value === sort ? `${o.label} ✓` : o.label,
+            onPress: () => handleSortSelect(o.value),
+          })),
+          { text: 'Cancel', style: 'cancel' as const },
+        ],
+        { cancelable: true }
+      );
+    }
+  }
+
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       setActivePostId(viewableItems[0]?.item?.id ?? null);
@@ -47,30 +104,43 @@ export default function FrontpageScreen() {
     []
   );
 
-  const fetchPosts = useCallback(async (reset: boolean, cursor?: string) => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
+  // fetchPosts captures 'sort' in its closure. A new sort value creates a new
+  // function reference, which causes the reset effect below to fire.
+  const fetchPosts = useCallback(
+    async (reset: boolean, cursor?: string) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
 
-    try {
-      setError(null);
-      const data = await getPosts(SUBREDDIT, SORT, cursor, controller.signal);
-      setPosts((prev) => (reset ? data.posts : [...prev, ...data.posts]));
-      const nextCursor =
-        data.after ?? (data.posts.length ? data.posts[data.posts.length - 1].name : undefined);
-      setAfter(nextCursor ?? undefined);
-      setHasMore(!!nextCursor && data.posts.length > 0);
-    } catch (err: any) {
-      if (err?.name !== 'AbortError') {
-        setError(err?.message ?? 'Failed to load posts');
+      try {
+        setError(null);
+        const data = await getPosts(SUBREDDIT, sort, cursor, controller.signal);
+        setPosts((prev) => (reset ? data.posts : [...prev, ...data.posts]));
+        const nextCursor =
+          data.after ?? (data.posts.length ? data.posts[data.posts.length - 1].name : undefined);
+        setAfter(nextCursor ?? undefined);
+        setHasMore(!!nextCursor && data.posts.length > 0);
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          setError(err?.message ?? 'Failed to load posts');
+        }
       }
-    }
-  }, []);
+    },
+    [sort]
+  );
 
+  // Fires on mount AND whenever fetchPosts changes (i.e. when sort changes).
+  // AbortController in fetchPosts ensures any in-flight request from the
+  // previous sort is cancelled before the new one starts.
   useEffect(() => {
+    setLoading(true);
+    setPosts([]);
+    setAfter(undefined);
+    setHasMore(true);
+    setActivePostId(null);
     fetchPosts(true).finally(() => setLoading(false));
     return () => abortRef.current?.abort();
-  }, []);
+  }, [fetchPosts]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -156,6 +226,8 @@ export default function FrontpageScreen() {
     );
   };
 
+  const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? 'Hot';
+
   return (
     <View style={styles.screen}>
       <Stack.Screen
@@ -165,12 +237,23 @@ export default function FrontpageScreen() {
           headerTintColor: Colors.text,
           headerTitleStyle: { fontWeight: '700', color: Colors.text },
           headerShown: true,
+          headerRight: () => (
+            <Pressable
+              onPress={openSortPicker}
+              style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+              hitSlop={8}
+              accessibilityLabel={`Sort: ${sortLabel}`}
+              accessibilityRole="button"
+            >
+              <MaterialIcons name="filter-list" size={24} color={BRAND} />
+            </Pressable>
+          ),
         }}
       />
 
       <View style={styles.fillContainer}>{renderBody()}</View>
 
-      {/* Footer: menu button pinned to bottom-right */}
+      {/* Bottom footer: bookmarks menu button */}
       <View
         style={[
           styles.footer,
@@ -236,6 +319,13 @@ const styles = StyleSheet.create({
   },
   errorBannerText: { color: Colors.textMuted, fontSize: Typography.sm },
   loadingMore: { paddingVertical: Spacing.xl },
+
+  headerBtn: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  headerBtnPressed: { opacity: 0.5 },
 
   footer: {
     flexDirection: 'row',
