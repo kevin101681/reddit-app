@@ -1,5 +1,5 @@
 ﻿import React, { memo, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Linking, LayoutAnimation } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Linking } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { RedditComment } from '../utils/types';
 import { buildMarkdownStyles, suppressImageRule } from '../utils/markdownStyles';
@@ -65,69 +65,53 @@ export const CommentThread = memo(function CommentThread({
   const replyCount = comment.replies?.length ?? 0;
 
   // Each nesting level adds a coloured left border + a single paddingLeft step.
-  // No marginLeft stacking — cumulative indent stays proportional and never
-  // pushes deeply-nested text off-screen.
   const nestedStyle = depth > 0
     ? { borderLeftWidth: 3, borderLeftColor: color, paddingLeft: Spacing.sm }
     : undefined;
 
+  if (isCollapsed) {
+    return (
+      <Pressable
+        onPress={() => setIsCollapsed(false)}
+        accessibilityRole="button"
+        accessibilityLabel="Expand comment"
+      >
+        <Text style={styles.collapsedPlaceholder}>[+] {comment.author}</Text>
+      </Pressable>
+    );
+  }
+
   return (
     <View style={[styles.container, nestedStyle]}>
+      <Pressable
+        onPress={() => setIsCollapsed(true)}
+        hitSlop={4}
+        accessibilityRole="button"
+        accessibilityLabel="Collapse comment"
+      >
+        <View style={styles.card}>
+          <View style={styles.bodyWrap}>
+            <Markdown
+              style={mdStyles}
+              onLinkPress={openLink}
+              rules={suppressImageRule}
+            >
+              {comment.body}
+            </Markdown>
+          </View>
+        </View>
+      </Pressable>
 
-      {isCollapsed ? (
-        // ── Collapsed: tap the placeholder to expand ──────────────────────────
-        <Pressable
-          onPress={() => {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setIsCollapsed(false);
-          }}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Expand comment"
-        >
-          <Text style={styles.collapsedPlaceholder}>[+]</Text>
-        </Pressable>
-      ) : (
-        // ── Expanded: tap the card to collapse ───────────────────────────────
-        <>
-          <Pressable
-            onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setIsCollapsed(true);
-            }}
-            hitSlop={4}
-            accessibilityRole="button"
-            accessibilityLabel="Collapse comment"
-          >
-            {/*
-              Material 3 card wraps the text content; the depth border
-              stays on the outer container so cards visually step inward.
-            */}
-            <View style={styles.card}>
-              <View style={styles.bodyWrap}>
-                <Markdown
-                  style={mdStyles}
-                  onLinkPress={openLink}
-                  rules={suppressImageRule}
-                >
-                  {comment.body}
-                </Markdown>
-              </View>
-            </View>
-          </Pressable>
-
-          {replyCount > 0 && (
-            <View style={styles.replies}>
-              {comment.replies!.map((reply) => (
-                <CommentThread
-                  key={reply.id}
-                  comment={reply}
-                  depth={depth + 1}
-                />
-              ))}
-            </View>
-          )}
-        </>
+      {replyCount > 0 && (
+        <View style={styles.replies}>
+          {comment.replies!.map((reply) => (
+            <CommentThread
+              key={reply.id}
+              comment={reply}
+              depth={depth + 1}
+            />
+          ))}
+        </View>
       )}
     </View>
   );
@@ -138,12 +122,11 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     paddingTop: Spacing.xs,
   },
-  // Tiny tappable target shown when the thread is collapsed
   collapsedPlaceholder: {
     color: BRAND,
     fontSize: Typography.xs,
     fontWeight: '700',
-    paddingVertical: 8,
+    padding: 12,
   },
   card: {
     backgroundColor: '#1E1E1E',

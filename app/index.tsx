@@ -2,10 +2,9 @@
 import {
   Animated,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -38,18 +37,18 @@ const SORT_OPTIONS = [
 export default function FrontpageScreen() {
   const insets = useSafeAreaInsets();
 
-  const [sort, setSort]           = useState('hot');
-  const [posts, setPosts]         = useState<RedditPost[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [sort, setSort]             = useState('hot');
+  const [posts, setPosts]           = useState<RedditPost[]>([]);
+  const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [after, setAfter]         = useState<string | undefined>(undefined);
-  const [hasMore, setHasMore]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
+  const [after, setAfter]           = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // ── Bottom sheet state ───────────────────────────────────────────────────────
+  // ── Menu state ───────────────────────────────────────────────────────────────
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuInput, setMenuInput]   = useState('');
   const [favorites, setFavorites]   = useState<string[]>([]);
@@ -57,7 +56,7 @@ export default function FrontpageScreen() {
   // ── Sort dropdown state ──────────────────────────────────────────────────────
   const [isSortOpen, setIsSortOpen] = useState(false);
 
-  // ── Viewability — MUST be useRef so FlatList never sees a new reference ─────
+  // ── Viewability ───────────────────────────────────────────────────────────────
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
   const onViewableItemsChanged = useRef(
@@ -66,7 +65,7 @@ export default function FrontpageScreen() {
     }
   ).current;
 
-  // ── FAB hide-on-scroll ───────────────────────────────────────────────────────
+  // ── FAB hide-on-scroll ────────────────────────────────────────────────────────
   const fabTranslateY = useRef(new Animated.Value(0)).current;
   const isFabHidden   = useRef(false);
   const lastScrollY   = useRef(0);
@@ -100,7 +99,7 @@ export default function FrontpageScreen() {
     [insets.bottom, fabTranslateY]
   );
 
-  // ── Sort ────────────────────────────────────────────────────────────────────
+  // ── Sort ──────────────────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
     getSortPreference().then((s) => { if (active) setSort(s); });
@@ -113,7 +112,7 @@ export default function FrontpageScreen() {
     setIsSortOpen(false);
   }, []);
 
-  // ── Favorites (bottom sheet) ─────────────────────────────────────────────────
+  // ── Favorites ─────────────────────────────────────────────────────────────────
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -150,7 +149,7 @@ export default function FrontpageScreen() {
     }, 50);
   }
 
-  // ── Data fetching ───────────────────────────────────────────────────────────
+  // ── Data fetching ─────────────────────────────────────────────────────────────
   const fetchPosts = useCallback(
     async (reset: boolean, cursor?: string) => {
       abortRef.current?.abort();
@@ -204,8 +203,9 @@ export default function FrontpageScreen() {
     [activePostId]
   );
 
-  // ── Render helpers ──────────────────────────────────────────────────────────
-  const fabPaddingBottom = Math.max(insets.bottom, Spacing.lg);
+  // ── Render ────────────────────────────────────────────────────────────────────
+  const fabBottom = Math.max(insets.bottom, Spacing.lg) + Spacing.lg;
+  const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? 'Hot';
 
   const renderBody = () => {
     if (loading) {
@@ -236,7 +236,7 @@ export default function FrontpageScreen() {
           style={styles.fillContainer}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: FAB_SIZE + fabPaddingBottom + Spacing.xl },
+            { paddingBottom: FAB_SIZE + fabBottom + Spacing.xl },
           ]}
           refreshControl={
             <RefreshControl
@@ -271,7 +271,7 @@ export default function FrontpageScreen() {
           }
         />
 
-        {/* Material 3 sort dropdown — floats over the list */}
+        {/* Material 3 sort dropdown */}
         {isSortOpen && (
           <>
             <Pressable style={styles.sortBackdrop} onPress={() => setIsSortOpen(false)} />
@@ -279,10 +279,7 @@ export default function FrontpageScreen() {
               {SORT_OPTIONS.map((option) => (
                 <Pressable
                   key={option.value}
-                  style={({ pressed }) => [
-                    styles.sortRow,
-                    pressed && styles.sortRowPressed,
-                  ]}
+                  style={({ pressed }) => [styles.sortRow, pressed && styles.sortRowPressed]}
                   onPress={() => handleSortSelect(option.value)}
                 >
                   <Text style={[styles.sortRowText, sort === option.value && styles.sortRowTextActive]}>
@@ -300,10 +297,11 @@ export default function FrontpageScreen() {
     );
   };
 
-  const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? 'Hot';
-
   return (
-    <View style={styles.screen}>
+    // Plain View — extends to the physical screen edges including bottom.
+    // paddingTop keeps content below the status bar; bottom is left at 0
+    // so the absolute-positioned menu panel can sit flush with the screen edge.
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       <Stack.Screen
         options={{
           title: 'r/all',
@@ -327,14 +325,11 @@ export default function FrontpageScreen() {
 
       <View style={styles.fillContainer}>{renderBody()}</View>
 
-      {/* Hide-on-scroll FAB — opens subreddit menu */}
+      {/* Hide-on-scroll FAB */}
       <Animated.View
         style={[
           styles.fab,
-          {
-            bottom: fabPaddingBottom + Spacing.lg,
-            transform: [{ translateY: fabTranslateY }],
-          },
+          { bottom: fabBottom, transform: [{ translateY: fabTranslateY }] },
         ]}
         pointerEvents="box-none"
       >
@@ -348,41 +343,44 @@ export default function FrontpageScreen() {
         </Pressable>
       </Animated.View>
 
-      {/* Subreddit panel — absolute-positioned, anchored flush to bottom */}
+      {/* Subreddit menu — direct child of the root View so bottom:0 is the
+          physical screen edge, eliminating any safe-area gap. */}
       {isMenuOpen && (
         <>
-          {/* Scrim — tap outside the sheet to dismiss */}
+          {/* Scrim */}
           <Pressable
-            style={styles.sheetScrim}
+            style={styles.menuScrim}
             onPress={() => setIsMenuOpen(false)}
           />
 
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.sheetWrapper}
-          >
-            <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
-              {/* Drag handle */}
-              <View style={styles.sheetHandle} />
+          <Animated.View style={styles.menuPanel}>
+            {/* Drag handle */}
+            <View style={styles.menuHandle} />
 
-              {/* Header */}
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Subreddits</Text>
-                <Pressable
-                  style={({ pressed }) => [styles.sheetClose, pressed && styles.sheetClosePressed]}
-                  onPress={() => setIsMenuOpen(false)}
-                  hitSlop={8}
-                  accessibilityLabel="Close menu"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.sheetCloseText}>✕</Text>
-                </Pressable>
-              </View>
+            {/* Title row */}
+            <View style={styles.menuHeader}>
+              <Text style={styles.menuTitle}>Subreddits</Text>
+              <Pressable
+                style={({ pressed }) => [styles.menuClose, pressed && styles.menuClosePressed]}
+                onPress={() => setIsMenuOpen(false)}
+                hitSlop={8}
+                accessibilityLabel="Close menu"
+                accessibilityRole="button"
+              >
+                <Text style={styles.menuCloseText}>✕</Text>
+              </Pressable>
+            </View>
 
-              {/* Search row */}
-              <View style={styles.sheetSearchRow}>
+            {/* Single ScrollView — search bar + favourites scroll as one block */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 16 }}
+            >
+              {/* Search bar */}
+              <View style={styles.searchRow}>
                 <TextInput
-                  style={styles.sheetInput}
+                  style={styles.searchInput}
                   placeholder="r/subreddit name…"
                   placeholderTextColor={Colors.textDisabled}
                   value={menuInput}
@@ -393,55 +391,53 @@ export default function FrontpageScreen() {
                   onSubmitEditing={() => navigateToSubreddit(menuInput)}
                 />
                 <Pressable
-                  style={({ pressed }) => [styles.sheetGoBtn, pressed && styles.sheetGoBtnPressed]}
+                  style={({ pressed }) => [styles.goBtn, pressed && styles.goBtnPressed]}
                   onPress={() => navigateToSubreddit(menuInput)}
                 >
-                  <Text style={styles.sheetGoBtnText}>Go</Text>
+                  <Text style={styles.goBtnText}>Go</Text>
                 </Pressable>
               </View>
 
-              {/* Favourites list */}
-              <Text style={styles.sheetSectionLabel}>
+              {/* Favourites */}
+              <Text style={styles.sectionLabel}>
                 {favorites.length === 0 ? 'NO FAVOURITES YET' : 'FAVOURITES'}
               </Text>
 
               {favorites.length === 0 ? (
-                <View style={styles.sheetEmpty}>
-                  <Text style={styles.sheetEmptyStar}>☆</Text>
-                  <Text style={styles.sheetEmptyTitle}>No saved subreddits</Text>
-                  <Text style={styles.sheetEmptyHint}>
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStar}>☆</Text>
+                  <Text style={styles.emptyTitle}>No saved subreddits</Text>
+                  <Text style={styles.emptyHint}>
                     Browse any subreddit and tap the ★ star in the header to save it here.
                   </Text>
                 </View>
               ) : (
-                <FlatList
-                  data={favorites}
-                  keyExtractor={(item) => item}
-                  style={styles.sheetList}
-                  contentContainerStyle={styles.sheetListContent}
-                  renderItem={({ item }) => (
-                    <View style={styles.sheetRow}>
-                      <Pressable
-                        style={({ pressed }) => [styles.sheetRowMain, pressed && styles.sheetRowMainPressed]}
-                        onPress={() => navigateToSubreddit(item)}
-                      >
-                        <Text style={styles.sheetRowName}>r/{item}</Text>
-                        <Text style={styles.sheetChevron}>›</Text>
-                      </Pressable>
-                      <Pressable
-                        style={({ pressed }) => [styles.sheetDeleteBtn, pressed && styles.sheetDeleteBtnPressed]}
-                        onPress={() => handleDeleteFavorite(item)}
-                        hitSlop={8}
-                      >
-                        <Text style={styles.sheetDeleteIcon}>🗑</Text>
-                      </Pressable>
-                    </View>
-                  )}
-                  ItemSeparatorComponent={() => <View style={styles.sheetSeparator} />}
-                />
+                <View style={styles.favList}>
+                  {favorites.map((fav, index) => (
+                    <React.Fragment key={fav}>
+                      <View style={styles.favRow}>
+                        <Pressable
+                          style={({ pressed }) => [styles.favMain, pressed && styles.favMainPressed]}
+                          onPress={() => navigateToSubreddit(fav)}
+                        >
+                          <Text style={styles.favName}>r/{fav}</Text>
+                          <Text style={styles.favChevron}>›</Text>
+                        </Pressable>
+                        <Pressable
+                          style={({ pressed }) => [styles.favDelete, pressed && styles.favDeletePressed]}
+                          onPress={() => handleDeleteFavorite(fav)}
+                          hitSlop={8}
+                        >
+                          <Text style={styles.favDeleteIcon}>🗑</Text>
+                        </Pressable>
+                      </View>
+                      {index < favorites.length - 1 && <View style={styles.favSeparator} />}
+                    </React.Fragment>
+                  ))}
+                </View>
               )}
-            </View>
-          </KeyboardAvoidingView>
+            </ScrollView>
+          </Animated.View>
         </>
       )}
     </View>
@@ -449,9 +445,10 @@ export default function FrontpageScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Root View — no SafeAreaView; touches physical screen edges
   screen: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#000',
   },
   fillContainer: {
     flex: 1,
@@ -496,6 +493,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   headerBtnPressed: { opacity: 0.5 },
+
+  // ── FAB ──────────────────────────────────────────────────────────────────────
   fab: {
     position: 'absolute',
     right: Spacing.lg,
@@ -515,7 +514,7 @@ const styles = StyleSheet.create({
   },
   fabBtnPressed: { opacity: 0.85 },
 
-  // ── Sort dropdown ────────────────────────────────────────────────────────────
+  // ── Sort dropdown ─────────────────────────────────────────────────────────────
   sortBackdrop: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 999,
@@ -543,40 +542,33 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
   },
   sortRowPressed: { backgroundColor: '#2a2a2a' },
-  sortRowText: {
-    color: Colors.text,
-    fontSize: Typography.md,
-  },
-  sortRowTextActive: {
-    color: BRAND,
-    fontWeight: '700',
-  },
+  sortRowText: { color: Colors.text, fontSize: Typography.md },
+  sortRowTextActive: { color: BRAND, fontWeight: '700' },
 
-  // ── Bottom sheet ─────────────────────────────────────────────────────────────
-  // Full-screen scrim behind the sheet — positioned absolute so it doesn't
-  // affect layout of the screen below.
-  sheetScrim: {
+  // ── Menu panel ────────────────────────────────────────────────────────────────
+  menuScrim: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.5)',
     zIndex: 99,
   },
-  // KeyboardAvoidingView wrapper — anchored at the bottom edge.
-  sheetWrapper: {
+  // Animated.View anchored to the physical bottom edge (bottom:0 of the root
+  // View which has no bottom safe-area padding). paddingBottom is applied
+  // inside the ScrollView contentContainerStyle.
+  menuPanel: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    margin: 0,
     zIndex: 100,
-  },
-  sheet: {
     backgroundColor: '#121212',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 24,
-    marginBottom: 0,
     maxHeight: '70%' as any,
+    paddingTop: 12,
+    paddingHorizontal: 0,
   },
-  sheetHandle: {
+  menuHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
@@ -584,18 +576,19 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: Spacing.sm,
   },
-  sheetHeader: {
+  menuHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    paddingHorizontal: 20,
+    marginBottom: Spacing.sm,
   },
-  sheetTitle: {
+  menuTitle: {
     flex: 1,
     color: Colors.text,
     fontSize: Typography.lg,
     fontWeight: '700',
   },
-  sheetClose: {
+  menuClose: {
     width: 30,
     height: 30,
     borderRadius: 15,
@@ -603,19 +596,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sheetClosePressed: { opacity: 0.6 },
-  sheetCloseText: {
+  menuClosePressed: { opacity: 0.6 },
+  menuCloseText: {
     color: Colors.textMuted,
     fontSize: Typography.md,
     lineHeight: 18,
   },
-  sheetSearchRow: {
+
+  // ── Search ────────────────────────────────────────────────────────────────────
+  searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.sm,
     gap: Spacing.sm,
   },
-  sheetInput: {
+  searchInput: {
     flex: 1,
     backgroundColor: Colors.surface,
     color: Colors.text,
@@ -626,15 +621,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  sheetGoBtn: {
+  goBtn: {
     backgroundColor: BRAND,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
   },
-  sheetGoBtnPressed: { opacity: 0.8 },
-  sheetGoBtnText: { color: '#fff', fontWeight: '700', fontSize: Typography.md },
-  sheetSectionLabel: {
+  goBtnPressed: { opacity: 0.8 },
+  goBtnText: { color: '#fff', fontWeight: '700', fontSize: Typography.md },
+
+  // ── Favourites ────────────────────────────────────────────────────────────────
+  sectionLabel: {
     color: Colors.textMuted,
     fontSize: Typography.xs,
     fontWeight: '700',
@@ -642,70 +639,64 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
     marginTop: Spacing.xs,
   },
-  sheetEmpty: {
-    flex: 1,
+  emptyState: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.xxl,
-    paddingBottom: 40,
+    paddingVertical: Spacing.xxl,
   },
-  sheetEmptyStar: {
+  emptyStar: {
     fontSize: 40,
     color: Colors.textDisabled,
     marginBottom: Spacing.md,
   },
-  sheetEmptyTitle: {
+  emptyTitle: {
     color: Colors.text,
     fontSize: Typography.lg,
     fontWeight: '700',
     marginBottom: Spacing.sm,
   },
-  sheetEmptyHint: {
+  emptyHint: {
     color: Colors.textMuted,
     fontSize: Typography.sm,
     textAlign: 'center',
     lineHeight: 20,
   },
-  sheetList: {
-    flex: 1,
-  },
-  sheetListContent: {
+  favList: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     overflow: 'hidden',
   },
-  sheetRow: {
+  favRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
   },
-  sheetRowMain: {
+  favMain: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
   },
-  sheetRowMainPressed: { backgroundColor: Colors.surfaceElevated },
-  sheetRowName: {
+  favMainPressed: { backgroundColor: Colors.surfaceElevated },
+  favName: {
     flex: 1,
     color: Colors.text,
     fontSize: Typography.md,
     fontWeight: '600',
   },
-  sheetChevron: {
+  favChevron: {
     color: Colors.textDisabled,
     fontSize: Typography.xl,
     fontWeight: '300',
     marginRight: Spacing.sm,
   },
-  sheetDeleteBtn: {
+  favDelete: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
   },
-  sheetDeleteBtnPressed: { opacity: 0.4 },
-  sheetDeleteIcon: { fontSize: 18 },
-  sheetSeparator: {
+  favDeletePressed: { opacity: 0.4 },
+  favDeleteIcon: { fontSize: 18 },
+  favSeparator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: Colors.border,
     marginLeft: Spacing.lg,
