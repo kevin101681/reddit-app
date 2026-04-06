@@ -1,12 +1,10 @@
 ﻿import React, { memo, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Linking } from 'react-native';
+import { View, Pressable, StyleSheet, Linking, Image } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { RedditComment } from '../utils/types';
 import { buildMarkdownStyles, suppressImageRule } from '../utils/markdownStyles';
 import { Colors, Typography, Spacing, Radius } from '../constants/theme';
 import { useTheme } from '../utils/ThemeContext';
-
-const BRAND = '#7ba0b3';
 
 // Cold-tone depth palette — cycles via modulo for deeper nesting
 const DEPTH_COLORS = [
@@ -60,39 +58,64 @@ export const CommentThread = memo(function CommentThread({
     ? { borderLeftWidth: 3, borderLeftColor: color, paddingLeft: Spacing.sm }
     : undefined;
 
+  // ── Collapsed: show only the depth border + blank tap target ─────────────
+  if (isCollapsed) {
+    return (
+      <View style={[styles.container, nestedStyle]}>
+        <Pressable
+          onPress={() => setIsCollapsed(false)}
+          style={styles.collapseTarget}
+          accessibilityRole="button"
+          accessibilityLabel="Expand comment"
+        />
+      </View>
+    );
+  }
+
+  // ── Expanded ──────────────────────────────────────────────────────────────
   return (
     <View style={[styles.container, nestedStyle]}>
-
-      {/* Card surface — background from theme */}
       <View style={[styles.card, { backgroundColor: theme.surface }]}>
 
-        {/* Toggle header — the ONLY tappable surface */}
+        {/* Blank 24px tap strip at the top of every card to collapse */}
         <Pressable
-          onPress={() => setIsCollapsed((c) => !c)}
+          onPress={() => setIsCollapsed(true)}
+          style={styles.collapseTarget}
           accessibilityRole="button"
-          accessibilityLabel={isCollapsed ? 'Expand comment' : 'Collapse comment'}
-          hitSlop={4}
-        >
-          <Text style={[styles.header, { color: isCollapsed ? theme.textMuted : theme.brand }]}>
-            {isCollapsed ? '[+]' : '[-]'} {comment.author}
-          </Text>
-        </Pressable>
+          accessibilityLabel="Collapse comment"
+        />
 
-        {/* Comment body — Markdown text color driven by theme */}
-        {!isCollapsed && (
-          <Markdown
-            style={mdStyles}
-            onLinkPress={openLink}
-            rules={suppressImageRule}
-          >
-            {comment.body}
-          </Markdown>
-        )}
+        {/* Comment body */}
+        <Markdown
+          style={mdStyles}
+          onLinkPress={openLink}
+          rules={suppressImageRule}
+        >
+          {comment.body}
+        </Markdown>
+
+        {/* Inline Reddit images from the comment body */}
+        {(() => {
+          const imageRegex = /(https?:\/\/(?:preview\.redd\.it|i\.redd\.it)[^\s)]+)/g;
+          const imageMatches = comment.body.match(imageRegex);
+          if (!imageMatches) return null;
+          return imageMatches.map((rawUrl, i) => {
+            const url = rawUrl.replace(/&amp;/g, '&');
+            return (
+              <Image
+                key={i}
+                source={{ uri: url }}
+                style={styles.inlineImage}
+                resizeMode="contain"
+              />
+            );
+          });
+        })()}
 
       </View>
 
       {/* Recursive replies */}
-      {!isCollapsed && replyCount > 0 && (
+      {replyCount > 0 && (
         <View style={styles.replies}>
           {comment.replies!.map((reply) => (
             <CommentThread
@@ -103,7 +126,6 @@ export const CommentThread = memo(function CommentThread({
           ))}
         </View>
       )}
-
     </View>
   );
 });
@@ -118,11 +140,17 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
-  header: {
-    color: BRAND,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    paddingVertical: 4,
+  // Invisible full-width tap strip used for both expand (collapsed state)
+  // and collapse (top of expanded card) — no text, just touch area.
+  collapseTarget: {
+    height: 24,
+    width: '100%',
+  },
+  inlineImage: {
+    width: '100%',
+    height: 200,
+    marginTop: Spacing.sm,
+    borderRadius: Radius.sm,
   },
   replies: {
     marginTop: Spacing.xs,

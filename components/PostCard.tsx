@@ -212,11 +212,13 @@ function PostCardInner({ post, activePostId, viewMode = 'standard' }: PostCardPr
             />
           </View>
         ) : (
-          <Image
-            source={{ uri: previewImageUrl! }}
-            style={[styles.image, { aspectRatio: imageAspectRatio }]}
-            resizeMode="contain"
-          />
+          <View style={styles.imageContainer}>
+            <Image
+              source={{ uri: previewImageUrl! }}
+              style={[styles.image, { aspectRatio: imageAspectRatio }]}
+              resizeMode="contain"
+            />
+          </View>
         )}
         {renderFooter()}
       </Pressable>
@@ -296,11 +298,17 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  imageContainer: {
+    width: '100%',
+    alignSelf: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
   image: {
     width: '100%',
+    alignSelf: 'center',
     maxHeight: 400,
     borderRadius: Radius.md,
-    marginBottom: Spacing.sm,
     backgroundColor: Colors.border,
   },
 

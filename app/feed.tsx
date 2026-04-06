@@ -21,6 +21,7 @@ import { FeedSkeleton } from '../components/SkeletonLoader';
 import { getFavorites, addFavorite, removeFavorite, getSortPreference, setSortPreference } from '../utils/storage';
 import { Colors, Spacing, Typography } from '../constants/theme';
 import { useTheme } from '../utils/ThemeContext';
+import { NavigationSheet } from '../components/NavigationSheet';
 
 const BRAND = '#7ba0b3';
 
@@ -290,6 +291,7 @@ export default function FeedScreen() {
           }
         />
       )}
+      <NavigationSheet />
     </>
   );
 }

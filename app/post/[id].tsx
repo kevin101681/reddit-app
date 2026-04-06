@@ -17,6 +17,7 @@ import { RedditComment } from '../../utils/types';
 import { CommentThread } from '../../components/CommentThread';
 import { SkeletonBox } from '../../components/SkeletonLoader';
 import { Colors, Spacing, Typography, Radius } from '../../constants/theme';
+import { NavigationSheet } from '../../components/NavigationSheet';
 
 const BRAND = '#7ba0b3';
 const FAB_SIZE = 56;
@@ -205,6 +206,7 @@ export default function PostDetailScreen() {
           </Pressable>
         </Animated.View>
       )}
+      <NavigationSheet />
     </View>
   );
 }
