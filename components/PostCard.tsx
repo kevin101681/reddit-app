@@ -12,6 +12,7 @@ import { router } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { RedditPost } from '../utils/types';
 import { Colors, Spacing, Typography, Radius } from '../constants/theme';
+import { useTheme } from '../utils/ThemeContext';
 
 const BRAND = '#7ba0b3';
 
@@ -24,6 +25,7 @@ interface PostCardProps {
 }
 
 function PostCardInner({ post, activePostId }: PostCardProps) {
+  const { theme } = useTheme();
   const [isMuted, setIsMuted] = useState(true);
   const [isTextExpanded, setIsTextExpanded] = useState(false);
   const videoRef = useRef<Video>(null);
@@ -106,7 +108,7 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
   function renderFooter() {
     return (
       <View style={styles.footer}>
-        <Text style={styles.subreddit} numberOfLines={1}>
+        <Text style={[styles.subreddit, { color: theme.brand }]} numberOfLines={1}>
           {post.subreddit_name_prefixed}
         </Text>
 
@@ -162,10 +164,10 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
     return (
       <Pressable
         onPress={openPostDetail}
-        android_ripple={{ color: Colors.primaryMuted }}
-        style={styles.card}
+        android_ripple={{ color: theme.primaryMuted }}
+        style={[styles.card, { backgroundColor: theme.surface }]}
       >
-        <Text style={styles.title}>
+        <Text style={[styles.title, { color: theme.text }]}>
           {post.over_18 ? '[NSFW] ' : ''}{post.title}
         </Text>
 
@@ -199,16 +201,16 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
     return (
       <Pressable
         onPress={openPostDetail}
-        android_ripple={{ color: Colors.primaryMuted }}
-        style={styles.card}
+        android_ripple={{ color: theme.primaryMuted }}
+        style={[styles.card, { backgroundColor: theme.surface }]}
       >
         <View style={styles.linkRow}>
           {/* Left: title + external link tap target */}
           <Pressable style={styles.linkTextArea} onPress={openExternalLink}>
-            <Text style={styles.title} numberOfLines={4}>
+            <Text style={[styles.title, { color: theme.text }]} numberOfLines={4}>
               {post.over_18 ? '[NSFW] ' : ''}{post.title}
             </Text>
-            <Text style={styles.linkDomain} numberOfLines={1}>
+            <Text style={[styles.linkDomain, { color: theme.textMuted }]} numberOfLines={1}>
               {(() => { try { return new URL(post.url).hostname.replace(/^www\./, ''); } catch { return post.url; } })()}
             </Text>
           </Pressable>
@@ -231,15 +233,15 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
     return (
       <Pressable
         onPress={openPostDetail}
-        android_ripple={{ color: Colors.primaryMuted }}
-        style={styles.card}
+        android_ripple={{ color: theme.primaryMuted }}
+        style={[styles.card, { backgroundColor: theme.surface }]}
       >
-        <Text style={styles.title}>
+        <Text style={[styles.title, { color: theme.text }]}>
           {post.over_18 ? '[NSFW] ' : ''}{post.title}
         </Text>
 
         <Text
-          style={styles.selftext}
+          style={[styles.selftext, { color: theme.textMuted }]}
           numberOfLines={isTextExpanded ? undefined : 3}
         >
           {post.selftext.trim()}
@@ -254,10 +256,10 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
   return (
     <Pressable
       onPress={openPostDetail}
-      android_ripple={{ color: Colors.primaryMuted }}
-      style={styles.card}
+      android_ripple={{ color: theme.primaryMuted }}
+      style={[styles.card, { backgroundColor: theme.surface }]}
     >
-      <Text style={styles.title}>
+      <Text style={[styles.title, { color: theme.text }]}>
         {post.over_18 ? '[NSFW] ' : ''}{post.title}
       </Text>
       {renderFooter()}

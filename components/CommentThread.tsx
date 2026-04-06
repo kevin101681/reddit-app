@@ -4,6 +4,7 @@ import Markdown from 'react-native-markdown-display';
 import { RedditComment } from '../utils/types';
 import { buildMarkdownStyles, suppressImageRule } from '../utils/markdownStyles';
 import { Colors, Typography, Spacing, Radius } from '../constants/theme';
+import { useTheme } from '../utils/ThemeContext';
 
 const BRAND = '#7ba0b3';
 
@@ -43,6 +44,7 @@ export const CommentThread = memo(function CommentThread({
   comment,
   depth = 0,
 }: CommentThreadProps) {
+  const { theme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const mdStyles = useCommentMdStyles(depth);
 
@@ -59,14 +61,10 @@ export const CommentThread = memo(function CommentThread({
     : undefined;
 
   return (
-    // ── Depth indicator ───────────────────────────────────────────────────────
     <View style={[styles.container, nestedStyle]}>
 
-      {/*
-        ── Material Card ─────────────────────────────────────────────────────
-        Plain View — NOT a Pressable. Only the header row inside is tappable.
-      */}
-      <View style={styles.card}>
+      {/* Card surface — background from theme */}
+      <View style={[styles.card, { backgroundColor: theme.surface }]}>
 
         {/* Toggle header — the ONLY tappable surface */}
         <Pressable
@@ -75,12 +73,12 @@ export const CommentThread = memo(function CommentThread({
           accessibilityLabel={isCollapsed ? 'Expand comment' : 'Collapse comment'}
           hitSlop={4}
         >
-          <Text style={styles.header}>
+          <Text style={[styles.header, { color: isCollapsed ? theme.textMuted : theme.brand }]}>
             {isCollapsed ? '[+]' : '[-]'} {comment.author}
           </Text>
         </Pressable>
 
-        {/* Comment body — plain Markdown, no wrapping Pressable */}
+        {/* Comment body — Markdown text color driven by theme */}
         {!isCollapsed && (
           <Markdown
             style={mdStyles}
@@ -93,10 +91,7 @@ export const CommentThread = memo(function CommentThread({
 
       </View>
 
-      {/*
-        ── Recursive replies — outside the card so they form their own
-        indented chain visually detached from the parent card.
-      */}
+      {/* Recursive replies */}
       {!isCollapsed && replyCount > 0 && (
         <View style={styles.replies}>
           {comment.replies!.map((reply) => (

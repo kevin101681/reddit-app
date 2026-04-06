@@ -20,6 +20,7 @@ import { PostCard } from '../components/PostCard';
 import { FeedSkeleton } from '../components/SkeletonLoader';
 import { getFavorites, addFavorite, removeFavorite, getSortPreference, setSortPreference } from '../utils/storage';
 import { Colors, Spacing, Typography } from '../constants/theme';
+import { useTheme } from '../utils/ThemeContext';
 
 const BRAND = '#7ba0b3';
 
@@ -33,6 +34,7 @@ const SORT_OPTIONS = [
 export default function FeedScreen() {
   const { subreddit } = useLocalSearchParams<{ subreddit: string }>();
   const sub = (Array.isArray(subreddit) ? subreddit[0] : subreddit) ?? 'popular';
+  const { theme, themeName, toggleTheme } = useTheme();
 
   // ── Viewability — MUST be useRef so FlatList never sees a new reference ─────
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
@@ -175,8 +177,26 @@ export default function FeedScreen() {
       <Stack.Screen
         options={{
           title: `r/${sub}`,
+          headerStyle: { backgroundColor: theme.surface },
+          headerTintColor: theme.text,
+          headerTitleStyle: { fontWeight: '700', color: theme.text },
           headerRight: () => (
             <View style={styles.headerRight}>
+              {/* Theme toggle */}
+              <Pressable
+                onPress={toggleTheme}
+                style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+                hitSlop={8}
+                accessibilityLabel={themeName === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                accessibilityRole="button"
+              >
+                <MaterialIcons
+                  name={themeName === 'dark' ? 'light-mode' : 'dark-mode'}
+                  size={22}
+                  color={BRAND}
+                />
+              </Pressable>
+
               {/* Sort picker */}
               <Pressable
                 onPress={openSortPicker}

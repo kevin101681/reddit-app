@@ -22,6 +22,7 @@ import { PostCard } from '../components/PostCard';
 import { FeedSkeleton } from '../components/SkeletonLoader';
 import { getFavorites, removeFavorite, getSortPreference, setSortPreference } from '../utils/storage';
 import { Colors, Spacing, Typography, Radius } from '../constants/theme';
+import { useTheme } from '../utils/ThemeContext';
 
 const SUBREDDIT = 'all';
 const BRAND     = '#7ba0b3';
@@ -36,6 +37,7 @@ const SORT_OPTIONS = [
 
 export default function FrontpageScreen() {
   const insets = useSafeAreaInsets();
+  const { theme, themeName, toggleTheme } = useTheme();
 
   const [sort, setSort]             = useState('hot');
   const [posts, setPosts]           = useState<RedditPost[]>([]);
@@ -210,7 +212,7 @@ export default function FrontpageScreen() {
   const renderBody = () => {
     if (loading) {
       return (
-        <View style={styles.fillContainer}>
+        <View style={[styles.fillContainer, { backgroundColor: theme.background }]}>
           <FeedSkeleton />
         </View>
       );
@@ -218,22 +220,22 @@ export default function FrontpageScreen() {
 
     if (error && posts.length === 0) {
       return (
-        <View style={styles.center}>
+        <View style={[styles.center, { backgroundColor: theme.background }]}>
           <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={styles.errorTitle}>Could not load posts</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
-          <Text style={styles.retryHint}>Pull down to retry</Text>
+          <Text style={[styles.errorTitle, { color: theme.text }]}>Could not load posts</Text>
+          <Text style={[styles.errorMessage, { color: theme.textMuted }]}>{error}</Text>
+          <Text style={[styles.retryHint, { color: theme.textMuted }]}>Pull down to retry</Text>
         </View>
       );
     }
 
     return (
-      <View style={styles.fillContainer}>
+      <View style={[styles.fillContainer, { backgroundColor: theme.background }]}>
         <FlatList
           data={posts}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          style={styles.fillContainer}
+          style={[styles.fillContainer, { backgroundColor: theme.background }]}
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: FAB_SIZE + fabBottom + Spacing.xl },
@@ -244,7 +246,7 @@ export default function FrontpageScreen() {
               onRefresh={onRefresh}
               tintColor={BRAND}
               colors={[BRAND]}
-              progressBackgroundColor={Colors.surface}
+              progressBackgroundColor={theme.surface}
             />
           }
           onEndReached={onEndReached}
@@ -259,8 +261,8 @@ export default function FrontpageScreen() {
           windowSize={11}
           ListHeaderComponent={
             error ? (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorBannerText}>⚠️ {error}</Text>
+              <View style={[styles.errorBanner, { backgroundColor: theme.surface }]}>
+                <Text style={[styles.errorBannerText, { color: theme.textMuted }]}>⚠️ {error}</Text>
               </View>
             ) : null
           }
@@ -275,14 +277,21 @@ export default function FrontpageScreen() {
         {isSortOpen && (
           <>
             <Pressable style={styles.sortBackdrop} onPress={() => setIsSortOpen(false)} />
-            <View style={styles.sortDropdown}>
+            <View style={[styles.sortDropdown, { backgroundColor: theme.surface }]}>
               {SORT_OPTIONS.map((option) => (
                 <Pressable
                   key={option.value}
-                  style={({ pressed }) => [styles.sortRow, pressed && styles.sortRowPressed]}
+                  style={({ pressed }) => [
+                    styles.sortRow,
+                    pressed && { backgroundColor: theme.surfaceElevated },
+                  ]}
                   onPress={() => handleSortSelect(option.value)}
                 >
-                  <Text style={[styles.sortRowText, sort === option.value && styles.sortRowTextActive]}>
+                  <Text style={[
+                    styles.sortRowText,
+                    { color: theme.text },
+                    sort === option.value && styles.sortRowTextActive,
+                  ]}>
                     {option.label}
                   </Text>
                   {sort === option.value && (
@@ -302,24 +311,39 @@ export default function FrontpageScreen() {
     // expo-router's Stack.Screen handles the top safe area natively via the
     // header; no paddingTop needed here. Bottom stays at 0 so the absolute
     // menu panel anchors flush to the physical screen edge.
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <Stack.Screen
         options={{
           title: 'r/all',
-          headerStyle: { backgroundColor: Colors.surface },
-          headerTintColor: Colors.text,
-          headerTitleStyle: { fontWeight: '700', color: Colors.text },
+          headerStyle: { backgroundColor: theme.surface },
+          headerTintColor: theme.text,
+          headerTitleStyle: { fontWeight: '700', color: theme.text },
           headerShown: true,
           headerRight: () => (
-            <Pressable
-              onPress={() => setIsSortOpen((prev) => !prev)}
-              style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
-              hitSlop={8}
-              accessibilityLabel={`Sort: ${sortLabel}`}
-              accessibilityRole="button"
-            >
-              <MaterialIcons name="filter-list" size={24} color={BRAND} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Pressable
+                onPress={toggleTheme}
+                style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+                hitSlop={8}
+                accessibilityLabel={themeName === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                accessibilityRole="button"
+              >
+                <MaterialIcons
+                  name={themeName === 'dark' ? 'light-mode' : 'dark-mode'}
+                  size={22}
+                  color={BRAND}
+                />
+              </Pressable>
+              <Pressable
+                onPress={() => setIsSortOpen((prev) => !prev)}
+                style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+                hitSlop={8}
+                accessibilityLabel={`Sort: ${sortLabel}`}
+                accessibilityRole="button"
+              >
+                <MaterialIcons name="filter-list" size={24} color={BRAND} />
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -354,21 +378,25 @@ export default function FrontpageScreen() {
             onPress={() => setIsMenuOpen(false)}
           />
 
-          <Animated.View style={styles.menuPanel}>
+          <Animated.View style={[styles.menuPanel, { backgroundColor: theme.surface }]}>
             {/* Drag handle */}
-            <View style={styles.menuHandle} />
+            <View style={[styles.menuHandle, { backgroundColor: theme.border }]} />
 
             {/* Title row */}
             <View style={styles.menuHeader}>
-              <Text style={styles.menuTitle}>Subreddits</Text>
+              <Text style={[styles.menuTitle, { color: theme.text }]}>Subreddits</Text>
               <Pressable
-                style={({ pressed }) => [styles.menuClose, pressed && styles.menuClosePressed]}
+                style={({ pressed }) => [
+                  styles.menuClose,
+                  { backgroundColor: theme.surfaceElevated },
+                  pressed && styles.menuClosePressed,
+                ]}
                 onPress={() => setIsMenuOpen(false)}
                 hitSlop={8}
                 accessibilityLabel="Close menu"
                 accessibilityRole="button"
               >
-                <Text style={styles.menuCloseText}>✕</Text>
+                <Text style={[styles.menuCloseText, { color: theme.textMuted }]}>✕</Text>
               </Pressable>
             </View>
 
@@ -381,9 +409,13 @@ export default function FrontpageScreen() {
               {/* Search bar */}
               <View style={styles.searchRow}>
                 <TextInput
-                  style={styles.searchInput}
+                  style={[styles.searchInput, {
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    borderColor: theme.border,
+                  }]}
                   placeholder="r/subreddit name…"
-                  placeholderTextColor={Colors.textDisabled}
+                  placeholderTextColor={theme.textMuted}
                   value={menuInput}
                   onChangeText={setMenuInput}
                   autoCapitalize="none"
@@ -400,29 +432,32 @@ export default function FrontpageScreen() {
               </View>
 
               {/* Favourites */}
-              <Text style={styles.sectionLabel}>
+              <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
                 {favorites.length === 0 ? 'NO FAVOURITES YET' : 'FAVOURITES'}
               </Text>
 
               {favorites.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Text style={styles.emptyStar}>☆</Text>
-                  <Text style={styles.emptyTitle}>No saved subreddits</Text>
-                  <Text style={styles.emptyHint}>
+                  <Text style={[styles.emptyStar, { color: theme.textMuted }]}>☆</Text>
+                  <Text style={[styles.emptyTitle, { color: theme.text }]}>No saved subreddits</Text>
+                  <Text style={[styles.emptyHint, { color: theme.textMuted }]}>
                     Browse any subreddit and tap the ★ star in the header to save it here.
                   </Text>
                 </View>
               ) : (
-                <View style={styles.favList}>
+                <View style={[styles.favList, { backgroundColor: theme.surfaceElevated }]}>
                   {favorites.map((fav, index) => (
                     <React.Fragment key={fav}>
-                      <View style={styles.favRow}>
+                      <View style={[styles.favRow, { backgroundColor: theme.surfaceElevated }]}>
                         <Pressable
-                          style={({ pressed }) => [styles.favMain, pressed && styles.favMainPressed]}
+                          style={({ pressed }) => [
+                            styles.favMain,
+                            pressed && { backgroundColor: theme.border },
+                          ]}
                           onPress={() => navigateToSubreddit(fav)}
                         >
-                          <Text style={styles.favName}>r/{fav}</Text>
-                          <Text style={styles.favChevron}>›</Text>
+                          <Text style={[styles.favName, { color: theme.text }]}>r/{fav}</Text>
+                          <Text style={[styles.favChevron, { color: theme.textMuted }]}>›</Text>
                         </Pressable>
                         <Pressable
                           style={({ pressed }) => [styles.favDelete, pressed && styles.favDeletePressed]}
@@ -432,7 +467,9 @@ export default function FrontpageScreen() {
                           <Text style={styles.favDeleteIcon}>🗑</Text>
                         </Pressable>
                       </View>
-                      {index < favorites.length - 1 && <View style={styles.favSeparator} />}
+                      {index < favorites.length - 1 && (
+                        <View style={[styles.favSeparator, { backgroundColor: theme.border }]} />
+                      )}
                     </React.Fragment>
                   ))}
                 </View>
