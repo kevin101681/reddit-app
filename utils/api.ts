@@ -26,6 +26,15 @@ async function redditFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
     throw new Error("API Error: " + response.status);
   }
 
+  // Guard against proxy or Reddit returning an HTML error page with HTTP 200.
+  // Peeking at Content-Type is fast and prevents the cryptic JSON parse crash.
+  const ct = response.headers.get("content-type") ?? "";
+  if (!ct.includes("application/json") && !ct.includes("text/json")) {
+    const preview = await response.clone().text().then((t) => t.slice(0, 120));
+    console.error("[API ERROR] Non-JSON response on " + Platform.OS + " (" + ct + "):", preview);
+    throw new Error("Non-JSON response — Reddit may be blocking the proxy IP");
+  }
+
   return response.json() as Promise<T>;
 }
 
