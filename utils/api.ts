@@ -1,6 +1,9 @@
-﻿import { RedditPost, RedditComment, PostsResponse, CommentsResponse } from './types';
+﻿import { Platform } from 'react-native';
+import { RedditPost, RedditComment, PostsResponse, CommentsResponse } from './types';
 
 const REDDIT_BASE = 'https://www.reddit.com';
+// Web traffic must go through the Netlify CORS proxy; native hits Reddit directly.
+const PROXY_BASE  = 'https://redditrpoxykevin.netlify.app/.netlify/functions/proxy';
 
 /**
  * Mobile-formatted User-Agent required by Reddit to avoid rate-limiting.
@@ -65,16 +68,12 @@ function normalizePost(child: any): RedditPost | null {
 // ─── Comment normalizer (recursive) ──────────────────────────────────────────
 
 function normalizeComment(child: any, depth = 0): RedditComment | null {
-  // Strict guard: drop "more" sentinel nodes, non-comments, bots, and
-  // anything missing an author (deleted/removed stubs that slipped through).
   if (!child || child.kind === 'more' || child.kind !== 't1') return null;
   if (!child.data?.author) return null;
   if (isBotChild(child)) return null;
 
   const d = child.data;
 
-  // Recurse into nested replies — apply the same strict filter before mapping
-  // so "more" sentinels and authorless stubs never reach normalizeComment.
   let replies: RedditComment[] = [];
   if (d.replies && typeof d.replies === 'object') {
     const replyChildren: any[] = d.replies?.data?.children ?? [];
@@ -98,8 +97,10 @@ function normalizeComment(child: any, depth = 0): RedditComment | null {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Fetch a page of posts directly from Reddit.
- * GET https://www.reddit.com/r/{subreddit}/{sort}.json?limit=25[&after=cursor]
+ * Fetch a page of posts.
+ *
+ * - Native (iOS/Android): hits Reddit directly — no CORS restrictions.
+ * - Web: routes through the Netlify proxy to satisfy browser CORS policy.
  */
 export async function getPosts(
   subreddit: string,
@@ -110,7 +111,11 @@ export async function getPosts(
   const params = new URLSearchParams({ limit: '25', raw_json: '1' });
   if (after) params.set('after', after);
 
-  const url = `${REDDIT_BASE}/r/${encodeURIComponent(subreddit)}/${encodeURIComponent(sort)}.json?${params}`;
+  const url =
+    Platform.OS === 'web'
+      ? `${PROXY_BASE}?subreddit=${encodeURIComponent(subreddit)}&sort=${encodeURIComponent(sort)}&${params}`
+      : `${REDDIT_BASE}/r/${encodeURIComponent(subreddit)}/${encodeURIComponent(sort)}.json?${params}`;
+
   const raw = await redditFetch<any>(url, signal);
 
   const posts = (raw?.data?.children ?? [])
@@ -122,8 +127,11 @@ export async function getPosts(
 }
 
 /**
- * Fetch the comment tree for a post directly from Reddit.
- * GET https://www.reddit.com/r/{subreddit}/comments/{postId}.json
+ * Fetch the comment tree for a post.
+ *
+ * - Native: hits Reddit directly.
+ * - Web: routes through the Netlify proxy.
+ *
  * Reddit returns a two-element array: [postListing, commentsListing].
  */
 export async function getComments(
@@ -131,10 +139,13 @@ export async function getComments(
   postId: string,
   signal?: AbortSignal
 ): Promise<CommentsResponse> {
-  const url = `${REDDIT_BASE}/r/${encodeURIComponent(subreddit)}/comments/${encodeURIComponent(postId)}.json?raw_json=1&limit=200`;
+  const url =
+    Platform.OS === 'web'
+      ? `${PROXY_BASE}?subreddit=${encodeURIComponent(subreddit)}&postId=${encodeURIComponent(postId)}&raw_json=1&limit=200`
+      : `${REDDIT_BASE}/r/${encodeURIComponent(subreddit)}/comments/${encodeURIComponent(postId)}.json?raw_json=1&limit=200`;
+
   const raw = await redditFetch<any[]>(url, signal);
 
-  // raw[0] = post listing, raw[1] = comments listing
   const commentChildren: any[] = raw?.[1]?.data?.children ?? [];
 
   const comments = commentChildren

@@ -1,4 +1,4 @@
-{
+﻿{
   "expo": {
     "name": "Personal Reddit",
     "slug": "personal-reddit-app",
@@ -28,7 +28,11 @@
     },
     "web": {
       "bundler": "metro",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "shortName": "Reddit App",
+      "name": "Personal Reddit Client",
+      "themeColor": "#7ba0b3",
+      "display": "standalone"
     },
     "plugins": [
       "expo-router",
