@@ -19,12 +19,15 @@ const BRAND = '#7ba0b3';
 // Thumbnails whose value is a sentinel string rather than a real URL
 const SENTINEL_THUMBNAILS = new Set(['self', 'default', 'nsfw', 'spoiler', 'image', '']);
 
+type ViewMode = 'standard' | 'compact';
+
 interface PostCardProps {
   post: RedditPost;
   activePostId?: string | null;
+  viewMode?: ViewMode;
 }
 
-function PostCardInner({ post, activePostId }: PostCardProps) {
+function PostCardInner({ post, activePostId, viewMode = 'standard' }: PostCardProps) {
   const { theme } = useTheme();
   const [isMuted, setIsMuted] = useState(true);
   const [isTextExpanded, setIsTextExpanded] = useState(false);
@@ -56,24 +59,26 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
       ? sourceImg.width / sourceImg.height
       : 16 / 9;
 
-  // ── Post-type classification ───────────────────────────────────────────────
-  // Type A: has a full preview image or is a native/gif video
+  // ── Post-type classification (used in standard mode) ──────────────────────
   const isTypeA = showVideo || (!!previewImageUrl && !SENTINEL_THUMBNAILS.has(post.thumbnail));
 
-  // Type B: external link post with a valid thumbnail but no full preview
   const hasThumbnail =
     !!post.thumbnail &&
     !SENTINEL_THUMBNAILS.has(post.thumbnail) &&
     post.thumbnail.startsWith('http');
   const isTypeB = !isTypeA && hasThumbnail;
 
-  // Type C: selftext post (pure text — only when neither A nor B)
   const isTypeC =
     !isTypeA &&
     !isTypeB &&
     post.is_self &&
     !!post.selftext &&
     post.selftext.trim().length > 0;
+
+  // Thumbnail to use in compact mode — prefer post.thumbnail, fall back to preview image
+  const compactThumb = hasThumbnail
+    ? post.thumbnail
+    : (previewImageUrl ?? null);
 
   // ── Navigation ──────────────────────────────────────────────────────────────
   function openPostDetail() {
@@ -159,18 +164,41 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
     );
   }
 
-  // ── Type A: standard media card ────────────────────────────────────────────
-  if (isTypeA) {
+  const cardStyle = [styles.card, { backgroundColor: theme.surface }];
+  const titleEl = (
+    <Text style={[styles.title, { color: theme.text }]} numberOfLines={viewMode === 'compact' ? 3 : undefined}>
+      {post.over_18 ? '[NSFW] ' : ''}{post.title}
+    </Text>
+  );
+
+  // ── Compact mode: always a horizontal row with small thumbnail ─────────────
+  if (viewMode === 'compact') {
     return (
       <Pressable
         onPress={openPostDetail}
         android_ripple={{ color: theme.primaryMuted }}
-        style={[styles.card, { backgroundColor: theme.surface }]}
+        style={cardStyle}
       >
-        <Text style={[styles.title, { color: theme.text }]}>
-          {post.over_18 ? '[NSFW] ' : ''}{post.title}
-        </Text>
+        <View style={styles.linkRow}>
+          <View style={styles.linkTextArea}>{titleEl}</View>
+          {compactThumb ? (
+            <Image source={{ uri: compactThumb }} style={styles.thumbnail} resizeMode="cover" />
+          ) : (
+            <View style={[styles.thumbnail, { backgroundColor: theme.surfaceElevated }]} />
+          )}
+        </View>
+        {renderFooter()}
+      </Pressable>
+    );
+  }
 
+  // ── Standard mode: render based on content type ────────────────────────────
+
+  // Type A — video or full preview image
+  if (isTypeA) {
+    return (
+      <Pressable onPress={openPostDetail} android_ripple={{ color: theme.primaryMuted }} style={cardStyle}>
+        {titleEl}
         {showVideo ? (
           <View style={styles.videoContainer}>
             <Video
@@ -190,78 +218,46 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
             resizeMode="contain"
           />
         )}
-
         {renderFooter()}
       </Pressable>
     );
   }
 
-  // ── Type B: external link with thumbnail ───────────────────────────────────
+  // Type B — external link with thumbnail
   if (isTypeB) {
     return (
-      <Pressable
-        onPress={openPostDetail}
-        android_ripple={{ color: theme.primaryMuted }}
-        style={[styles.card, { backgroundColor: theme.surface }]}
-      >
+      <Pressable onPress={openPostDetail} android_ripple={{ color: theme.primaryMuted }} style={cardStyle}>
         <View style={styles.linkRow}>
-          {/* Left: title + external link tap target */}
           <Pressable style={styles.linkTextArea} onPress={openExternalLink}>
-            <Text style={[styles.title, { color: theme.text }]} numberOfLines={4}>
-              {post.over_18 ? '[NSFW] ' : ''}{post.title}
-            </Text>
+            {titleEl}
             <Text style={[styles.linkDomain, { color: theme.textMuted }]} numberOfLines={1}>
               {(() => { try { return new URL(post.url).hostname.replace(/^www\./, ''); } catch { return post.url; } })()}
             </Text>
           </Pressable>
-
-          {/* Right: small thumbnail */}
-          <Image
-            source={{ uri: post.thumbnail }}
-            style={styles.thumbnail}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: post.thumbnail }} style={styles.thumbnail} resizeMode="cover" />
         </View>
-
         {renderFooter()}
       </Pressable>
     );
   }
 
-  // ── Type C: expandable selftext ────────────────────────────────────────────
+  // Type C — expandable selftext
   if (isTypeC) {
     return (
-      <Pressable
-        onPress={openPostDetail}
-        android_ripple={{ color: theme.primaryMuted }}
-        style={[styles.card, { backgroundColor: theme.surface }]}
-      >
-        <Text style={[styles.title, { color: theme.text }]}>
-          {post.over_18 ? '[NSFW] ' : ''}{post.title}
-        </Text>
-
-        <Text
-          style={[styles.selftext, { color: theme.textMuted }]}
-          numberOfLines={isTextExpanded ? undefined : 3}
-        >
+      <Pressable onPress={openPostDetail} android_ripple={{ color: theme.primaryMuted }} style={cardStyle}>
+        {titleEl}
+        <Text style={[styles.selftext, { color: theme.textMuted }]} numberOfLines={isTextExpanded ? undefined : 3}>
           {post.selftext.trim()}
         </Text>
-
         {renderFooter()}
       </Pressable>
     );
   }
 
-  // ── Fallback: title-only card ──────────────────────────────────────────────
+  // Fallback — title only
   return (
-    <Pressable
-      onPress={openPostDetail}
-      android_ripple={{ color: theme.primaryMuted }}
-      style={[styles.card, { backgroundColor: theme.surface }]}
-    >
-      <Text style={[styles.title, { color: theme.text }]}>
-        {post.over_18 ? '[NSFW] ' : ''}{post.title}
-      </Text>
+    <Pressable onPress={openPostDetail} android_ripple={{ color: theme.primaryMuted }} style={cardStyle}>
+      {titleEl}
       {renderFooter()}
     </Pressable>
   );

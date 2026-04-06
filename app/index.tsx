@@ -58,6 +58,9 @@ export default function FrontpageScreen() {
   // ── Sort dropdown state ──────────────────────────────────────────────────────
   const [isSortOpen, setIsSortOpen] = useState(false);
 
+  // ── View mode ────────────────────────────────────────────────────────────────
+  const [viewMode, setViewMode] = useState<'standard' | 'compact'>('standard');
+
   // ── Viewability ───────────────────────────────────────────────────────────────
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
@@ -200,9 +203,9 @@ export default function FrontpageScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: RedditPost }) => (
-      <PostCard post={item} activePostId={activePostId} />
+      <PostCard post={item} activePostId={activePostId} viewMode={viewMode} />
     ),
-    [activePostId]
+    [activePostId, viewMode]
   );
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -330,6 +333,19 @@ export default function FrontpageScreen() {
               >
                 <MaterialIcons
                   name={themeName === 'dark' ? 'light-mode' : 'dark-mode'}
+                  size={22}
+                  color={BRAND}
+                />
+              </Pressable>
+              <Pressable
+                onPress={() => setViewMode((m) => m === 'standard' ? 'compact' : 'standard')}
+                style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+                hitSlop={8}
+                accessibilityLabel={viewMode === 'standard' ? 'Switch to compact view' : 'Switch to standard view'}
+                accessibilityRole="button"
+              >
+                <MaterialIcons
+                  name={viewMode === 'standard' ? 'view-list' : 'view-agenda'}
                   size={22}
                   color={BRAND}
                 />
@@ -483,10 +499,10 @@ export default function FrontpageScreen() {
 }
 
 const styles = StyleSheet.create({
-  // Root View — no SafeAreaView; touches physical screen edges
+  // Root View — no SafeAreaView; touches physical screen edges.
+  // Background color applied inline from theme so it updates on toggle.
   screen: {
     flex: 1,
-    backgroundColor: '#000',
   },
   fillContainer: {
     flex: 1,

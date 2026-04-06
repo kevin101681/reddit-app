@@ -35,6 +35,7 @@ export default function FeedScreen() {
   const { subreddit } = useLocalSearchParams<{ subreddit: string }>();
   const sub = (Array.isArray(subreddit) ? subreddit[0] : subreddit) ?? 'popular';
   const { theme, themeName, toggleTheme } = useTheme();
+  const [viewMode, setViewMode] = useState<'standard' | 'compact'>('standard');
 
   // ── Viewability — MUST be useRef so FlatList never sees a new reference ─────
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
@@ -165,9 +166,9 @@ export default function FeedScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: RedditPost }) => (
-      <PostCard post={item} activePostId={activePostId} />
+      <PostCard post={item} activePostId={activePostId} viewMode={viewMode} />
     ),
-    [activePostId]
+    [activePostId, viewMode]
   );
 
   const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? 'Hot';
@@ -192,6 +193,21 @@ export default function FeedScreen() {
               >
                 <MaterialIcons
                   name={themeName === 'dark' ? 'light-mode' : 'dark-mode'}
+                  size={22}
+                  color={BRAND}
+                />
+              </Pressable>
+
+              {/* View mode toggle */}
+              <Pressable
+                onPress={() => setViewMode((m) => m === 'standard' ? 'compact' : 'standard')}
+                style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+                hitSlop={8}
+                accessibilityLabel={viewMode === 'standard' ? 'Switch to compact view' : 'Switch to standard view'}
+                accessibilityRole="button"
+              >
+                <MaterialIcons
+                  name={viewMode === 'standard' ? 'view-list' : 'view-agenda'}
                   size={22}
                   color={BRAND}
                 />
