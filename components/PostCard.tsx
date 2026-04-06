@@ -25,9 +25,11 @@ interface PostCardProps {
   activePostId?: string | null;
   viewMode?: ViewMode;
   currentTheme?: AppTheme;
+  /** Override navigation — used by split-screen to select a post without pushing a route */
+  onPress?: () => void;
 }
 
-function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme }: PostCardProps) {
+function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme, onPress }: PostCardProps) {
   const { theme: hookTheme } = useTheme();
   const theme = currentTheme ?? hookTheme;
 
@@ -82,6 +84,7 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
     : (previewImageUrl ?? null);
 
   function openPostDetail() {
+    if (onPress) { onPress(); return; }
     router.push({
       pathname: "/post/[id]",
       params: {

@@ -140,12 +140,15 @@ export async function getPosts(
  * Reddit returns a two-element array: [postListing, commentsListing].
  */
 export async function getComments(
-  subreddit: string,
+  subreddit: string | undefined,
   postId: string,
   signal?: AbortSignal
 ): Promise<CommentsResponse> {
   // 1. Always build the canonical Reddit URL first
-  let endpoint = REDDIT_BASE + "/r/" + encodeURIComponent(subreddit) + "/comments/" + encodeURIComponent(postId) + ".json?raw_json=1&limit=200";
+  // Subreddit is optional: omitting it uses Reddit's global /comments/{id} endpoint
+  let endpoint = subreddit
+    ? REDDIT_BASE + "/r/" + encodeURIComponent(subreddit) + "/comments/" + encodeURIComponent(postId) + ".json?raw_json=1&limit=200"
+    : REDDIT_BASE + "/comments/" + encodeURIComponent(postId) + ".json?raw_json=1&limit=200";
 
   // 2. On web only: wrap the Reddit URL in corsproxy.io
   if (Platform.OS === "web") {

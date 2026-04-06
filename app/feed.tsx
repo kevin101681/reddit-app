@@ -5,6 +5,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   ViewToken,
   ActivityIndicator,
@@ -13,6 +14,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { getPosts } from "../utils/api";
 import { RedditPost } from "../utils/types";
 import { PostCard } from "../components/PostCard";
+import PostDetail from "../components/PostDetail";
 import { FeedSkeleton } from "../components/SkeletonLoader";
 import {
   getFavorites,
@@ -27,13 +29,15 @@ import { Colors, Spacing, Typography } from "../constants/theme";
 import { useTheme } from "../utils/ThemeContext";
 import { NavigationSheet } from "../components/NavigationSheet";
 
-const BRAND   = "#7ba0b3";
+const BRAND    = "#7ba0b3";
 const FAB_SIZE = 56;
 
 export default function FeedScreen() {
   const { subreddit } = useLocalSearchParams<{ subreddit: string }>();
   const sub = (Array.isArray(subreddit) ? subreddit[0] : subreddit) ?? "popular";
   const { theme, themeName } = useTheme();
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 850;
 
   // ── Preferences ─────────────────────────────────────────────────────────────
   const [sort, setSort]         = useState("hot");
@@ -62,9 +66,10 @@ export default function FeedScreen() {
     });
   }, [sub]);
 
-  // ── Viewability ───────────────────────────────────────────────────────────────
+  // ── Viewability ─────────────────────────────────────────────────────────────
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
-  const [activePostId, setActivePostId] = useState<string | null>(null);
+  const [activePostId, setActivePostId]   = useState<string | null>(null);
+  const [selectedPost, setSelectedPost]   = useState<RedditPost | null>(null);
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       setActivePostId(viewableItems[0]?.item?.id ?? null);
@@ -86,20 +91,13 @@ export default function FeedScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    getFavorites().then((favs) => {
-      if (!cancelled) setIsFavorited(favs.includes(sub.toLowerCase()));
-    });
+    getFavorites().then((favs) => { if (!cancelled) setIsFavorited(favs.includes(sub.toLowerCase())); });
     return () => { cancelled = true; };
   }, [sub]);
 
   async function toggleFavorite() {
-    if (isFavorited) {
-      await removeFavorite(sub);
-      setIsFavorited(false);
-    } else {
-      await addFavorite(sub);
-      setIsFavorited(true);
-    }
+    if (isFavorited) { await removeFavorite(sub); setIsFavorited(false); }
+    else             { await addFavorite(sub);    setIsFavorited(true); }
   }
 
   // ── Data fetching ───────────────────────────────────────────────────────────
@@ -108,13 +106,11 @@ export default function FeedScreen() {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
-
       try {
         setError(null);
         const data = await getPosts(sub, sort, cursor, controller.signal);
         setPosts((prev) => (reset ? data.posts : [...prev, ...data.posts]));
-        const nextCursor =
-          data.after ?? (data.posts.length ? data.posts[data.posts.length - 1].name : undefined);
+        const nextCursor = data.after ?? (data.posts.length ? data.posts[data.posts.length - 1].name : undefined);
         setAfter(nextCursor ?? undefined);
         setHasMore(!!nextCursor && data.posts.length > 0);
       } catch (err: any) {
@@ -130,6 +126,7 @@ export default function FeedScreen() {
     setAfter(undefined);
     setHasMore(true);
     setActivePostId(null);
+    setSelectedPost(null);
     fetchPosts(true).finally(() => setLoading(false));
     return () => abortRef.current?.abort();
   }, [fetchPosts]);
@@ -151,15 +148,81 @@ export default function FeedScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: RedditPost }) => (
-      <PostCard post={item} activePostId={activePostId} viewMode={viewMode} currentTheme={theme} />
+      <PostCard
+        post={item}
+        activePostId={activePostId}
+        viewMode={viewMode}
+        currentTheme={theme}
+        onPress={isDesktop ? () => setSelectedPost(item) : undefined}
+      />
     ),
-    [activePostId, viewMode, theme]
+    [activePostId, viewMode, theme, isDesktop]
   );
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Feed column ─────────────────────────────────────────────────────────────
+  const renderFeed = () => {
+    if (loading) {
+      return (
+        <View style={[styles.fillContainer, { backgroundColor: theme.background }]}>
+          <FeedSkeleton />
+        </View>
+      );
+    }
+    if (error && posts.length === 0) {
+      return (
+        <View style={[styles.center, { backgroundColor: theme.background }]}>
+          <Text style={styles.errorIcon}>{"⚠️"}</Text>
+          <Text style={[styles.errorTitle, { color: theme.text }]}>{"Could not load r/" + sub}</Text>
+          <Text style={[styles.errorMessage, { color: theme.textMuted }]}>{error}</Text>
+          <Text style={[styles.retryHint, { color: theme.textMuted }]}>Pull down to retry</Text>
+        </View>
+      );
+    }
+    return (
+      <FlatList
+        data={posts}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        extraData={themeName}
+        style={[styles.fillContainer, { backgroundColor: theme.background }]}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: isDesktop ? Spacing.xl : FAB_SIZE + 80 + Spacing.xl },
+        ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={BRAND}
+            colors={[BRAND]}
+            progressBackgroundColor={theme.surface}
+          />
+        }
+        onEndReached={onEndReached}
+        onEndReachedThreshold={0.4}
+        viewabilityConfig={viewabilityConfig}
+        onViewableItemsChanged={onViewableItemsChanged}
+        scrollEventThrottle={16}
+        removeClippedSubviews
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={11}
+        ListHeaderComponent={
+          error ? (
+            <View style={[styles.errorBanner, { backgroundColor: theme.surface }]}>
+              <Text style={[styles.errorBannerText, { color: theme.textMuted }]}>{"⚠️ " + error}</Text>
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          loadingMore ? <ActivityIndicator color={BRAND} style={styles.loadingMore} /> : null
+        }
+      />
+    );
+  };
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      {/* Clean header — only the subreddit title and favourite star */}
       <Stack.Screen
         options={{
           title: "r/" + sub,
@@ -182,62 +245,39 @@ export default function FeedScreen() {
         }}
       />
 
-      {loading ? (
-        <View style={[styles.fillContainer, { backgroundColor: theme.background }]}>
-          <FeedSkeleton />
-        </View>
-      ) : error && posts.length === 0 ? (
-        <View style={[styles.center, { backgroundColor: theme.background }]}>
-          <Text style={styles.errorIcon}>{"⚠️"}</Text>
-          <Text style={[styles.errorTitle, { color: theme.text }]}>{"Could not load r/" + sub}</Text>
-          <Text style={[styles.errorMessage, { color: theme.textMuted }]}>{error}</Text>
-          <Text style={[styles.retryHint, { color: theme.textMuted }]}>Pull down to retry</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={posts}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          extraData={themeName}
-          style={[styles.fillContainer, { backgroundColor: theme.background }]}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: FAB_SIZE + 80 + Spacing.xl },
-          ]}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={BRAND}
-              colors={[BRAND]}
-              progressBackgroundColor={theme.surface}
-            />
-          }
-          onEndReached={onEndReached}
-          onEndReachedThreshold={0.4}
-          viewabilityConfig={viewabilityConfig}
-          onViewableItemsChanged={onViewableItemsChanged}
-          scrollEventThrottle={16}
-          removeClippedSubviews
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={11}
-          ListHeaderComponent={
-            error ? (
-              <View style={[styles.errorBanner, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.errorBannerText, { color: theme.textMuted }]}>{"⚠️ " + error}</Text>
-              </View>
-            ) : null
-          }
-          ListFooterComponent={
-            loadingMore ? (
-              <ActivityIndicator color={BRAND} style={styles.loadingMore} />
-            ) : null
-          }
-        />
-      )}
+      {/* Split-screen row on desktop; single column on mobile */}
+      <View style={[styles.fillContainer, isDesktop && styles.row]}>
 
-      {/* FAB + slide-up menu with sort, view mode, theme, and subreddit nav */}
+        {/* Left: feed column */}
+        <View style={[
+          styles.fillContainer,
+          isDesktop && { maxWidth: 450, borderRightWidth: 1, borderColor: theme.border },
+        ]}>
+          {renderFeed()}
+        </View>
+
+        {/* Right: post detail pane — desktop only */}
+        {isDesktop && (
+          <View style={[styles.fillContainer, { backgroundColor: theme.background }]}>
+            {selectedPost ? (
+              <PostDetail
+                postId={selectedPost.id}
+                subreddit={selectedPost.subreddit}
+                subredditNamePrefixed={selectedPost.subreddit_name_prefixed}
+                url={selectedPost.url}
+                embedded
+              />
+            ) : (
+              <View style={styles.emptyPane}>
+                <Text style={[styles.emptyPaneText, { color: theme.textMuted }]}>
+                  Select a post to read comments
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+
       <NavigationSheet
         sort={sort}
         onSortSelect={handleSortSelect}
@@ -251,45 +291,20 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   screen:        { flex: 1 },
   fillContainer: { flex: 1 },
+  row:           { flexDirection: "row" },
   listContent:   { paddingTop: Spacing.sm },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: Spacing.xl,
-  },
-  errorIcon: { fontSize: 40, marginBottom: Spacing.md },
-  errorTitle: {
-    color: Colors.text,
-    fontSize: Typography.lg,
-    fontWeight: "700",
-    marginBottom: Spacing.sm,
-  },
-  errorMessage: {
-    color: Colors.textMuted,
-    fontSize: Typography.sm,
-    textAlign: "center",
-    marginBottom: Spacing.md,
-  },
-  retryHint: { color: Colors.textDisabled, fontSize: Typography.sm },
-  errorBanner: {
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.sm,
-    padding: Spacing.md,
-    borderRadius: 8,
-  },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: Spacing.xl },
+  errorIcon:    { fontSize: 40, marginBottom: Spacing.md },
+  errorTitle:   { color: Colors.text, fontSize: Typography.lg, fontWeight: "700", marginBottom: Spacing.sm },
+  errorMessage: { color: Colors.textMuted, fontSize: Typography.sm, textAlign: "center", marginBottom: Spacing.md },
+  retryHint:    { color: Colors.textDisabled, fontSize: Typography.sm },
+  errorBanner: { marginHorizontal: Spacing.md, marginBottom: Spacing.sm, padding: Spacing.md, borderRadius: 8 },
   errorBannerText: { fontSize: Typography.sm },
-  loadingMore: { paddingVertical: Spacing.xl },
-  starBtn: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-  },
+  loadingMore:  { paddingVertical: Spacing.xl },
+  emptyPane:    { flex: 1, alignItems: "center", justifyContent: "center", padding: Spacing.xl },
+  emptyPaneText: { fontSize: Typography.md },
+  starBtn:        { paddingHorizontal: Spacing.sm, paddingVertical: 2 },
   starBtnPressed: { opacity: 0.5 },
-  starIcon: {
-    fontSize: 24,
-    color: Colors.textMuted,
-  },
-  starIconFilled: {
-    color: BRAND,
-  },
+  starIcon:       { fontSize: 24, color: Colors.textMuted },
+  starIconFilled: { color: BRAND },
 });
