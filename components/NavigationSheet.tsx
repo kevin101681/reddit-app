@@ -1,7 +1,7 @@
-﻿import React, { useCallback, useRef, useState } from "react";
+﻿import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Pressable,
   ScrollView,
@@ -44,11 +44,33 @@ export function NavigationSheet({
   const insets = useSafeAreaInsets();
   const { theme, themeName, toggleTheme } = useTheme();
 
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [menuInput, setMenuInput]   = useState("");
-  const [favorites, setFavorites]   = useState<string[]>([]);
+  const [isMenuOpen,    setIsMenuOpen]    = useState(false);
+  const [menuInput,     setMenuInput]     = useState("");
+  const [favorites,     setFavorites]     = useState<string[]>([]);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const fabTranslateY = useRef(new Animated.Value(0)).current;
+
+  // ── Manual keyboard height tracking ────────────────────────────────────────
+  // KeyboardAvoidingView is unreliable inside absolute-positioned bottom sheets.
+  // Instead, we track the keyboard height ourselves and shift the panel up by
+  // exactly that amount.
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showListener = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideListener = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -96,7 +118,7 @@ export function NavigationSheet({
 
   return (
     <>
-      {/* FAB — hamburger icon */}
+      {/* FAB */}
       <Animated.View
         style={[
           styles.fab,
@@ -116,173 +138,174 @@ export function NavigationSheet({
 
       {isMenuOpen && (
         <>
-          {/* Scrim — closes menu on tap outside */}
+          {/* Scrim */}
           <Pressable style={styles.menuScrim} onPress={() => setIsMenuOpen(false)} />
 
-          {/* KeyboardAvoidingView holds the sheet so the TextInput is never
-              hidden behind the software keyboard when it opens. */}
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.menuKAV}
+          {/* Menu panel — shifts up by keyboardHeight so the TextInput is
+              never obscured by the software keyboard. */}
+          <Animated.View
+            style={[
+              styles.menuPanel,
+              { backgroundColor: theme.surface },
+              { bottom: keyboardHeight > 0 ? keyboardHeight : 0 },
+            ]}
           >
-            <Animated.View style={[styles.menuPanel, { backgroundColor: theme.surface }]}>
-              <View style={[styles.menuHandle, { backgroundColor: theme.border }]} />
+            <View style={[styles.menuHandle, { backgroundColor: theme.border }]} />
 
-              {/* Header row — close button only */}
-              <View style={styles.menuHeader}>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.menuClose,
-                    { backgroundColor: theme.surfaceElevated },
-                    pressed && styles.menuClosePressed,
-                  ]}
-                  onPress={() => setIsMenuOpen(false)}
-                  hitSlop={8}
-                  accessibilityLabel="Close menu"
-                  accessibilityRole="button"
-                >
-                  <Text style={[styles.menuCloseText, { color: theme.textMuted }]}>{"✕"}</Text>
-                </Pressable>
-              </View>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 16 }}
+            {/* Header row — close button only */}
+            <View style={styles.menuHeader}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.menuClose,
+                  { backgroundColor: theme.surfaceElevated },
+                  pressed && styles.menuClosePressed,
+                ]}
+                onPress={() => setIsMenuOpen(false)}
+                hitSlop={8}
+                accessibilityLabel="Close menu"
+                accessibilityRole="button"
               >
-                {/* ── Theme & View Mode toggles ───────────────────────────── */}
-                <View style={styles.controlRow}>
+                <Text style={[styles.menuCloseText, { color: theme.textMuted }]}>{"✕"}</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 16 }}
+            >
+              {/* ── Theme & View Mode toggles ───────────────────────────── */}
+              <View style={styles.controlRow}>
+                <Pressable
+                  style={[styles.controlBtn, { borderColor: theme.border, backgroundColor: theme.background }]}
+                  onPress={toggleTheme}
+                  accessibilityRole="button"
+                  accessibilityLabel={themeName === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                >
+                  <MaterialIcons
+                    name={themeName === "dark" ? "light-mode" : "dark-mode"}
+                    size={20}
+                    color={BRAND}
+                  />
+                  <Text style={[styles.controlLabel, { color: theme.textMuted }]}>
+                    {themeName === "dark" ? "Light" : "Dark"}
+                  </Text>
+                </Pressable>
+
+                {onViewModeToggle && (
                   <Pressable
                     style={[styles.controlBtn, { borderColor: theme.border, backgroundColor: theme.background }]}
-                    onPress={toggleTheme}
+                    onPress={() => { onViewModeToggle(); setIsMenuOpen(false); }}
                     accessibilityRole="button"
-                    accessibilityLabel={themeName === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                    accessibilityLabel={viewMode === "standard" ? "Switch to compact view" : "Switch to standard view"}
                   >
                     <MaterialIcons
-                      name={themeName === "dark" ? "light-mode" : "dark-mode"}
+                      name={viewMode === "standard" ? "view-list" : "view-agenda"}
                       size={20}
                       color={BRAND}
                     />
                     <Text style={[styles.controlLabel, { color: theme.textMuted }]}>
-                      {themeName === "dark" ? "Light" : "Dark"}
+                      {viewMode === "standard" ? "Compact" : "Standard"}
                     </Text>
                   </Pressable>
+                )}
+              </View>
 
-                  {onViewModeToggle && (
+              {/* ── Sort chips ──────────────────────────────────────────── */}
+              {showSort && (
+                <View style={styles.sortChips}>
+                  {SORT_OPTIONS.map((option) => (
                     <Pressable
-                      style={[styles.controlBtn, { borderColor: theme.border, backgroundColor: theme.background }]}
-                      onPress={() => { onViewModeToggle(); setIsMenuOpen(false); }}
+                      key={option.value}
+                      style={[
+                        styles.sortChip,
+                        { borderColor: theme.border, backgroundColor: theme.background },
+                        sort === option.value && styles.sortChipActive,
+                      ]}
+                      onPress={() => handleSortChip(option.value)}
                       accessibilityRole="button"
-                      accessibilityLabel={viewMode === "standard" ? "Switch to compact view" : "Switch to standard view"}
+                      accessibilityLabel={"Sort by " + option.label}
+                      accessibilityState={{ selected: sort === option.value }}
                     >
-                      <MaterialIcons
-                        name={viewMode === "standard" ? "view-list" : "view-agenda"}
-                        size={20}
-                        color={BRAND}
-                      />
-                      <Text style={[styles.controlLabel, { color: theme.textMuted }]}>
-                        {viewMode === "standard" ? "Compact" : "Standard"}
+                      <Text style={[
+                        styles.sortChipText,
+                        { color: theme.textMuted },
+                        sort === option.value && styles.sortChipTextActive,
+                      ]}>
+                        {option.label}
                       </Text>
                     </Pressable>
-                  )}
+                  ))}
                 </View>
+              )}
 
-                {/* ── Sort chips (no label — chips are self-evident) ──────── */}
-                {showSort && (
-                  <View style={styles.sortChips}>
-                    {SORT_OPTIONS.map((option) => (
-                      <Pressable
-                        key={option.value}
-                        style={[
-                          styles.sortChip,
-                          { borderColor: theme.border, backgroundColor: theme.background },
-                          sort === option.value && styles.sortChipActive,
-                        ]}
-                        onPress={() => handleSortChip(option.value)}
-                        accessibilityRole="button"
-                        accessibilityLabel={"Sort by " + option.label}
-                        accessibilityState={{ selected: sort === option.value }}
-                      >
-                        <Text style={[
-                          styles.sortChipText,
-                          { color: theme.textMuted },
-                          sort === option.value && styles.sortChipTextActive,
-                        ]}>
-                          {option.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
+              {/* ── Subreddit search ────────────────────────────────────── */}
+              <View style={styles.searchRow}>
+                <TextInput
+                  style={[styles.searchInput, {
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    borderColor: theme.border,
+                  }]}
+                  placeholderTextColor={theme.textMuted}
+                  value={menuInput}
+                  onChangeText={setMenuInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="go"
+                  onSubmitEditing={() => navigateToSubreddit(menuInput)}
+                />
+                <Pressable
+                  style={({ pressed }) => [styles.goBtn, pressed && styles.goBtnPressed]}
+                  onPress={() => navigateToSubreddit(menuInput)}
+                >
+                  <Text style={styles.goBtnText}>Go</Text>
+                </Pressable>
+              </View>
 
-                {/* ── Subreddit search ─────────────────────────────────────── */}
-                <View style={styles.searchRow}>
-                  <TextInput
-                    style={[styles.searchInput, {
-                      backgroundColor: theme.background,
-                      color: theme.text,
-                      borderColor: theme.border,
-                    }]}
-                    placeholderTextColor={theme.textMuted}
-                    value={menuInput}
-                    onChangeText={setMenuInput}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="go"
-                    onSubmitEditing={() => navigateToSubreddit(menuInput)}
-                  />
-                  <Pressable
-                    style={({ pressed }) => [styles.goBtn, pressed && styles.goBtnPressed]}
-                    onPress={() => navigateToSubreddit(menuInput)}
-                  >
-                    <Text style={styles.goBtnText}>Go</Text>
-                  </Pressable>
+              {/* ── Favourites ──────────────────────────────────────────── */}
+              {favorites.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={[styles.emptyStar, { color: theme.textMuted }]}>{"☆"}</Text>
+                  <Text style={[styles.emptyTitle, { color: theme.text }]}>No saved subreddits</Text>
+                  <Text style={[styles.emptyHint, { color: theme.textMuted }]}>
+                    Browse any subreddit and tap the {"★"} star in the header to save it here.
+                  </Text>
                 </View>
-
-                {/* ── Favourites list (no label) ───────────────────────────── */}
-                {favorites.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <Text style={[styles.emptyStar, { color: theme.textMuted }]}>{"☆"}</Text>
-                    <Text style={[styles.emptyTitle, { color: theme.text }]}>No saved subreddits</Text>
-                    <Text style={[styles.emptyHint, { color: theme.textMuted }]}>
-                      Browse any subreddit and tap the {"★"} star in the header to save it here.
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={[styles.favList, { backgroundColor: theme.surfaceElevated }]}>
-                    {favorites.map((fav, index) => (
-                      <React.Fragment key={fav}>
-                        <View style={[styles.favRow, { backgroundColor: theme.surfaceElevated }]}>
-                          <Pressable
-                            style={({ pressed }) => [
-                              styles.favMain,
-                              pressed && { backgroundColor: theme.border },
-                            ]}
-                            onPress={() => navigateToSubreddit(fav)}
-                          >
-                            <Text style={[styles.favName, { color: theme.text }]}>{"r/" + fav}</Text>
-                            <Text style={[styles.favChevron, { color: theme.textMuted }]}>{"›"}</Text>
-                          </Pressable>
-                          <Pressable
-                            style={({ pressed }) => [styles.favDelete, pressed && styles.favDeletePressed]}
-                            onPress={() => handleDeleteFavorite(fav)}
-                            hitSlop={8}
-                            accessibilityLabel={"Remove r/" + fav + " from favourites"}
-                            accessibilityRole="button"
-                          >
-                            <MaterialIcons name="delete-outline" size={24} color="#888" />
-                          </Pressable>
-                        </View>
-                        {index < favorites.length - 1 && (
-                          <View style={[styles.favSeparator, { backgroundColor: theme.border }]} />
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </View>
-                )}
-              </ScrollView>
-            </Animated.View>
-          </KeyboardAvoidingView>
+              ) : (
+                <View style={[styles.favList, { backgroundColor: theme.surfaceElevated }]}>
+                  {favorites.map((fav, index) => (
+                    <React.Fragment key={fav}>
+                      <View style={[styles.favRow, { backgroundColor: theme.surfaceElevated }]}>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.favMain,
+                            pressed && { backgroundColor: theme.border },
+                          ]}
+                          onPress={() => navigateToSubreddit(fav)}
+                        >
+                          <Text style={[styles.favName, { color: theme.text }]}>{"r/" + fav}</Text>
+                          <Text style={[styles.favChevron, { color: theme.textMuted }]}>{">"}</Text>
+                        </Pressable>
+                        <Pressable
+                          style={({ pressed }) => [styles.favDelete, pressed && styles.favDeletePressed]}
+                          onPress={() => handleDeleteFavorite(fav)}
+                          hitSlop={8}
+                          accessibilityLabel={"Remove r/" + fav + " from favourites"}
+                          accessibilityRole="button"
+                        >
+                          <MaterialIcons name="delete-outline" size={24} color="#888" />
+                        </Pressable>
+                      </View>
+                      {index < favorites.length - 1 && (
+                        <View style={[styles.favSeparator, { backgroundColor: theme.border }]} />
+                      )}
+                    </React.Fragment>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          </Animated.View>
         </>
       )}
     </>
@@ -316,18 +339,14 @@ const styles = StyleSheet.create({
     zIndex: 99,
   },
 
-  // KeyboardAvoidingView — absolutely positioned at the bottom, above the scrim.
-  // On iOS (behavior=padding) it gains paddingBottom = keyboard height, nudging
-  // the sheet upward so the TextInput stays visible.
-  menuKAV: {
+  // Position is absolute; bottom is set dynamically via keyboardHeight state
+  // so the panel lifts cleanly above the software keyboard on both platforms.
+  menuPanel: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     zIndex: 100,
-  },
-
-  menuPanel: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: "80%" as any,

@@ -32,7 +32,7 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
   const theme = currentTheme ?? hookTheme;
 
   const [isTextExpanded, setIsTextExpanded] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const videoRef = useRef<Video>(null);
 
   // HLS carries audio; prefer it over the silent fallback_url dash stream
