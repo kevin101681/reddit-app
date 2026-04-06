@@ -64,18 +64,21 @@ function normalizePost(child: any): RedditPost | null {
 // ─── Comment normalizer (recursive) ──────────────────────────────────────────
 
 function normalizeComment(child: any, depth = 0): RedditComment | null {
-  // Filter out "more" sentinel nodes and bot authors at every level
+  // Strict guard: drop "more" sentinel nodes, non-comments, bots, and
+  // anything missing an author (deleted/removed stubs that slipped through).
   if (!child || child.kind === 'more' || child.kind !== 't1') return null;
+  if (!child.data?.author) return null;
   if (isBotChild(child)) return null;
 
   const d = child.data;
 
-  // Recurse into nested replies, dropping more-nodes and bots at every level
+  // Recurse into nested replies — apply the same strict filter before mapping
+  // so "more" sentinels and authorless stubs never reach normalizeComment.
   let replies: RedditComment[] = [];
   if (d.replies && typeof d.replies === 'object') {
     const replyChildren: any[] = d.replies?.data?.children ?? [];
     replies = replyChildren
-      .filter((c: any) => !isBotChild(c))
+      .filter((c: any) => c?.kind !== 'more' && c?.data?.author && !isBotChild(c))
       .map((c: any) => normalizeComment(c, depth + 1))
       .filter((c): c is RedditComment => c !== null);
   }
@@ -134,7 +137,7 @@ export async function getComments(
   const commentChildren: any[] = raw?.[1]?.data?.children ?? [];
 
   const comments = commentChildren
-    .filter((c: any) => !isBotChild(c))
+    .filter((c: any) => c?.kind !== 'more' && c?.data?.author && !isBotChild(c))
     .map((c: any) => normalizeComment(c, 0))
     .filter((c): c is RedditComment => c !== null);
 

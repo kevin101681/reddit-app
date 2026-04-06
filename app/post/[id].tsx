@@ -171,15 +171,15 @@ export default function PostDetailScreen() {
         <FlatList
           style={styles.list}
           data={topLevelComments}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => item?.id ? String(item.id) : String(index)}
           renderItem={renderComment}
           ListFooterComponent={renderListFooter}
           onScroll={isExternalLink ? handleScroll : undefined}
           scrollEventThrottle={16}
-          removeClippedSubviews
+          removeClippedSubviews={false}
           initialNumToRender={10}
-          maxToRenderPerBatch={8}
-          windowSize={7}
+          maxToRenderPerBatch={15}
+          windowSize={10}
         />
       )}
 
