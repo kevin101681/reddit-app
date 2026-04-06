@@ -4,6 +4,7 @@ import {
   Animated,
   FlatList,
   Linking,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -113,13 +114,13 @@ export default function PostDetail({
       isFabHidden.current = true;
       Animated.spring(fabTranslateY, {
         toValue: FAB_SIZE + 32 + insets.bottom,
-        useNativeDriver: true, damping: 20, stiffness: 200,
+        useNativeDriver: Platform.OS !== "web", damping: 20, stiffness: 200,
       }).start();
     } else if (dy < 0 && isFabHidden.current) {
       isFabHidden.current = false;
       Animated.spring(fabTranslateY, {
         toValue: 0,
-        useNativeDriver: true, damping: 20, stiffness: 200,
+        useNativeDriver: Platform.OS !== "web", damping: 20, stiffness: 200,
       }).start();
     }
   }

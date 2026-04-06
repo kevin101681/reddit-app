@@ -26,19 +26,6 @@ async function redditFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
     throw new Error("API Error: " + response.status);
   }
 
-  // allorigins /get always returns a JSON envelope:
-  //   { contents: "<raw response body>", status: { http_code: 200, ... } }
-  // Unwrap it on web so the rest of the code sees plain Reddit JSON.
-  // On native we hit Reddit directly and parse the response as-is.
-  if (Platform.OS === "web") {
-    const wrapper = await response.json() as { contents: string; status: { http_code: number } };
-    if (wrapper.status.http_code !== 200) {
-      console.error("[API ERROR] allorigins upstream " + wrapper.status.http_code + ":", url);
-      throw new Error("API Error: " + wrapper.status.http_code);
-    }
-    return JSON.parse(wrapper.contents) as T;
-  }
-
   return response.json() as Promise<T>;
 }
 
@@ -114,7 +101,7 @@ function normalizeComment(child: any, depth = 0): RedditComment | null {
  * Fetch a page of posts.
  *
  * Native (iOS/Android): hits reddit.com directly.
- * Web: routes through allorigins.win/raw to bypass CORS and datacenter IP blocks.
+ * Web: routes through the Netlify serverless proxy to bypass CORS.
  */
 export async function getPosts(
   subreddit: string,
@@ -128,9 +115,9 @@ export async function getPosts(
   // 1. Always build the canonical Reddit URL first
   let endpoint = REDDIT_BASE + "/r/" + encodeURIComponent(subreddit) + "/" + encodeURIComponent(sort) + ".json?" + params.toString();
 
-  // 2. On web only: route through allorigins.win to bypass CORS and datacenter IP blocks
+  // 2. On web: route through our Netlify function to bypass CORS (runs server-side with a proper User-Agent).
   if (Platform.OS === "web") {
-    endpoint = "https://api.allorigins.win/get?url=" + encodeURIComponent(endpoint);
+    endpoint = "/.netlify/functions/proxy?url=" + encodeURIComponent(endpoint);
   }
 
   const raw = await redditFetch<any>(endpoint, signal);
@@ -147,7 +134,7 @@ export async function getPosts(
  * Fetch the comment tree for a post.
  *
  * Native (iOS/Android): hits reddit.com directly.
- * Web: routes through allorigins.win/raw to bypass CORS and datacenter IP blocks.
+ * Web: routes through the Netlify serverless proxy to bypass CORS.
  *
  * Reddit returns a two-element array: [postListing, commentsListing].
  */
@@ -162,9 +149,9 @@ export async function getComments(
     ? REDDIT_BASE + "/r/" + encodeURIComponent(subreddit) + "/comments/" + encodeURIComponent(postId) + ".json?raw_json=1&limit=200"
     : REDDIT_BASE + "/comments/" + encodeURIComponent(postId) + ".json?raw_json=1&limit=200";
 
-  // 2. On web only: route through allorigins.win to bypass CORS and datacenter IP blocks
+  // 2. On web: route through our Netlify function to bypass CORS (runs server-side with a proper User-Agent).
   if (Platform.OS === "web") {
-    endpoint = "https://api.allorigins.win/get?url=" + encodeURIComponent(endpoint);
+    endpoint = "/.netlify/functions/proxy?url=" + encodeURIComponent(endpoint);
   }
 
   const raw = await redditFetch<any[]>(endpoint, signal);

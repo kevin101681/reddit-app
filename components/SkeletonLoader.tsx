@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { Platform, View, StyleSheet, Animated } from 'react-native';
 import { Colors, Radius, Spacing } from '../constants/theme';
 
 interface SkeletonBoxProps {
@@ -18,12 +18,12 @@ export function SkeletonBox({ width, height, borderRadius = Radius.sm, style }: 
         Animated.timing(shimmer, {
           toValue: 1,
           duration: 900,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(shimmer, {
           toValue: 0,
           duration: 900,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ])
     ).start();

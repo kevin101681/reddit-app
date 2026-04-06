@@ -1,4 +1,4 @@
-﻿import React, { memo, useRef, useState } from "react";
+﻿import React, { memo, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   Linking,
   StyleSheet,
 } from "react-native";
-import { Video, ResizeMode } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { router } from "expo-router";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { RedditPost } from "../utils/types";
@@ -35,7 +35,6 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
 
   const [isTextExpanded, setIsTextExpanded] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
-  const videoRef = useRef<Video>(null);
 
   // HLS carries audio; prefer it over the silent fallback_url dash stream
   const nativeVideoUrl =
@@ -51,6 +50,21 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
 
   const videoUrl  = nativeVideoUrl ?? gifUrl;
   const showVideo = !!videoUrl;
+
+  // expo-video: hook must be called unconditionally; null source = idle player
+  const player = useVideoPlayer(videoUrl ?? null, (p) => {
+    p.loop   = true;
+    p.muted  = true;
+  });
+
+  useEffect(() => {
+    if (!videoUrl) return;
+    if (activePostId === post.id) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [activePostId, post.id, player, videoUrl]);
 
   const previewImageUrl =
     post.preview?.images?.[0]?.resolutions?.[2]?.url?.replace(/&amp;/g, "&") ??
@@ -177,18 +191,15 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
         {titleEl}
         {showVideo ? (
           <View style={styles.videoContainer}>
-            <Video
-              ref={videoRef}
-              source={{ uri: videoUrl! }}
+            <VideoView
+              player={player}
               style={styles.video}
-              shouldPlay={activePostId === post.id}
-              isLooping
-              isMuted={isMuted}
-              resizeMode={ResizeMode.CONTAIN}
+              contentFit="contain"
+              nativeControls={false}
             />
             <Pressable
               style={styles.muteBtn}
-              onPress={() => setIsMuted((prev) => !prev)}
+              onPress={() => { player.muted = !isMuted; setIsMuted((prev) => !prev); }}
               accessibilityLabel={isMuted ? "Unmute video" : "Mute video"}
               accessibilityRole="button"
             >

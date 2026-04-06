@@ -2,7 +2,7 @@
 import { Platform, UIManager } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Audio } from 'expo-av';
+import { setAudioModeAsync } from 'expo-audio';
 import { ThemeProvider, useTheme } from '../utils/ThemeContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -52,10 +52,7 @@ function RootStack() {
 export default function RootLayout() {
   useEffect(() => {
     // Allow video audio through the iOS silent switch; don't hog audio in background.
-    Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
-    });
+    setAudioModeAsync({ playsInSilentMode: true });
   }, []);
 
   return (

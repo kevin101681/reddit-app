@@ -1,0 +1,6 @@
+﻿[build]
+  command   = "npx expo export -p web"
+  publish   = "dist"
+
+[functions]
+  directory = "netlify/functions"
