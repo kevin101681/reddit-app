@@ -2,8 +2,9 @@
 import { RedditPost, RedditComment, PostsResponse, CommentsResponse } from "./types";
 
 const REDDIT_BASE = "https://www.reddit.com";
-const PROXY_BASE  = "https://redditrpoxykevin.netlify.app/.netlify/functions/proxy";
 
+// Mobile User-Agent reduces Reddit rate-limiting on native.
+// Browsers block spoofed User-Agent headers outright, so we only send it on native.
 const USER_AGENT = "android:com.personal.redditapp:v1.0.0 (by /u/kevin101681)";
 
 // ─── Core fetch ───────────────────────────────────────────────────────────────
@@ -11,13 +12,14 @@ const USER_AGENT = "android:com.personal.redditapp:v1.0.0 (by /u/kevin101681)";
 async function redditFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
   console.log("[API START] Fetching " + Platform.OS + ":", url);
 
-  const response = await fetch(url, {
-    headers: {
-      "Accept":     "application/json",
-      "User-Agent": USER_AGENT,
-    },
-    signal,
-  });
+  // Browsers silently drop (or hard-block) a spoofed User-Agent, so we omit it
+  // on web and only attach it for native builds where it reduces rate-limiting.
+  const headers: Record<string, string> = { "Accept": "application/json" };
+  if (Platform.OS !== "web") {
+    headers["User-Agent"] = USER_AGENT;
+  }
+
+  const response = await fetch(url, { headers, signal });
 
   if (!response.ok) {
     console.error("[API ERROR] " + response.status + " on " + Platform.OS + ":", url);
@@ -98,8 +100,9 @@ function normalizeComment(child: any, depth = 0): RedditComment | null {
 /**
  * Fetch a page of posts.
  *
- * Default: direct reddit.com endpoint (iOS / Android).
- * Web override: Netlify CORS proxy (browser same-origin policy).
+ * Native (iOS/Android): hits reddit.com directly.
+ * Web: wraps the identical Reddit URL in corsproxy.io to satisfy the
+ *      browser's same-origin policy — no custom backend required.
  */
 export async function getPosts(
   subreddit: string,
@@ -110,12 +113,12 @@ export async function getPosts(
   const params = new URLSearchParams({ limit: "25", raw_json: "1" });
   if (after) params.set("after", after);
 
-  // 1. Default: raw Reddit endpoint — safe for iOS / Android
+  // 1. Always build the canonical Reddit URL first
   let endpoint = REDDIT_BASE + "/r/" + encodeURIComponent(subreddit) + "/" + encodeURIComponent(sort) + ".json?" + params.toString();
 
-  // 2. Web-only override: route through the CORS proxy
+  // 2. On web only: wrap the Reddit URL in corsproxy.io
   if (Platform.OS === "web") {
-    endpoint = PROXY_BASE + "?subreddit=" + encodeURIComponent(subreddit) + "&sort=" + encodeURIComponent(sort) + "&" + params.toString();
+    endpoint = "https://corsproxy.io/?" + encodeURIComponent(endpoint);
   }
 
   const raw = await redditFetch<any>(endpoint, signal);
@@ -131,8 +134,8 @@ export async function getPosts(
 /**
  * Fetch the comment tree for a post.
  *
- * Default: direct reddit.com endpoint (iOS / Android).
- * Web override: Netlify CORS proxy (browser same-origin policy).
+ * Native (iOS/Android): hits reddit.com directly.
+ * Web: wraps the identical Reddit URL in corsproxy.io.
  *
  * Reddit returns a two-element array: [postListing, commentsListing].
  */
@@ -141,12 +144,12 @@ export async function getComments(
   postId: string,
   signal?: AbortSignal
 ): Promise<CommentsResponse> {
-  // 1. Default: raw Reddit endpoint — safe for iOS / Android
+  // 1. Always build the canonical Reddit URL first
   let endpoint = REDDIT_BASE + "/r/" + encodeURIComponent(subreddit) + "/comments/" + encodeURIComponent(postId) + ".json?raw_json=1&limit=200";
 
-  // 2. Web-only override: route through the CORS proxy
+  // 2. On web only: wrap the Reddit URL in corsproxy.io
   if (Platform.OS === "web") {
-    endpoint = PROXY_BASE + "?subreddit=" + encodeURIComponent(subreddit) + "&postId=" + encodeURIComponent(postId) + "&raw_json=1&limit=200";
+    endpoint = "https://corsproxy.io/?" + encodeURIComponent(endpoint);
   }
 
   const raw = await redditFetch<any[]>(endpoint, signal);
