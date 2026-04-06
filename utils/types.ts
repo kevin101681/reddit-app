@@ -19,6 +19,7 @@ export interface RedditPost {
     }>;
     /** Reddit-hosted GIF-to-video preview (cross-post / preview fallback) */
     reddit_video_preview?: {
+      hls_url?: string;
       fallback_url: string;
       height?: number;
       width?: number;
@@ -28,6 +29,7 @@ export interface RedditPost {
   /** Present on native Reddit video posts (is_video === true) */
   secure_media?: {
     reddit_video?: {
+      hls_url?: string;
       fallback_url: string;
       height?: number;
       width?: number;

@@ -32,11 +32,14 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
   const theme = currentTheme ?? hookTheme;
 
   const [isTextExpanded, setIsTextExpanded] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const videoRef = useRef<Video>(null);
 
+  // HLS carries audio; prefer it over the silent fallback_url dash stream
   const nativeVideoUrl =
+    post.secure_media?.reddit_video?.hls_url ??
     post.secure_media?.reddit_video?.fallback_url ??
+    post.preview?.reddit_video_preview?.hls_url ??
     post.preview?.reddit_video_preview?.fallback_url ??
     null;
 
