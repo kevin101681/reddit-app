@@ -258,6 +258,7 @@ export default function FeedScreen() {
           data={posts}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
+          extraData={themeName}
           style={styles.container}
           contentContainerStyle={styles.listContent}
           refreshControl={

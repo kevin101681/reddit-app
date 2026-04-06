@@ -48,8 +48,6 @@ export default function FrontpageScreen() {
   const abortRef = useRef<AbortController | null>(null);
 
 
-  // ── Sort dropdown state ──────────────────────────────────────────────────────
-  const [isSortOpen, setIsSortOpen] = useState(false);
 
   // ── View mode ────────────────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState<'standard' | 'compact'>('standard');
@@ -74,7 +72,6 @@ export default function FrontpageScreen() {
   const handleSortSelect = useCallback(async (newSort: string) => {
     setSortPreference(newSort, SUBREDDIT);
     setSort(newSort);
-    setIsSortOpen(false);
   }, []);
 
   // ── Data fetching ─────────────────────────────────────────────────────────────
@@ -132,7 +129,6 @@ export default function FrontpageScreen() {
   );
 
   // ── Render ────────────────────────────────────────────────────────────────────
-  const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? 'Hot';
 
   const renderBody = () => {
     if (loading) {
@@ -160,6 +156,7 @@ export default function FrontpageScreen() {
           data={posts}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
+          extraData={themeName}
           style={[styles.fillContainer, { backgroundColor: theme.background }]}
           contentContainerStyle={[
             styles.listContent,
@@ -197,35 +194,6 @@ export default function FrontpageScreen() {
           }
         />
 
-        {/* Material 3 sort dropdown */}
-        {isSortOpen && (
-          <>
-            <Pressable style={styles.sortBackdrop} onPress={() => setIsSortOpen(false)} />
-            <View style={[styles.sortDropdown, { backgroundColor: theme.surface }]}>
-              {SORT_OPTIONS.map((option) => (
-                <Pressable
-                  key={option.value}
-                  style={({ pressed }) => [
-                    styles.sortRow,
-                    pressed && { backgroundColor: theme.surfaceElevated },
-                  ]}
-                  onPress={() => handleSortSelect(option.value)}
-                >
-                  <Text style={[
-                    styles.sortRowText,
-                    { color: theme.text },
-                    sort === option.value && styles.sortRowTextActive,
-                  ]}>
-                    {option.label}
-                  </Text>
-                  {sort === option.value && (
-                    <MaterialIcons name="check" size={16} color={BRAND} />
-                  )}
-                </Pressable>
-              ))}
-            </View>
-          </>
-        )}
       </View>
     );
   };
@@ -271,15 +239,6 @@ export default function FrontpageScreen() {
                   color={BRAND}
                 />
               </Pressable>
-              <Pressable
-                onPress={() => setIsSortOpen((prev) => !prev)}
-                style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
-                hitSlop={8}
-                accessibilityLabel={`Sort: ${sortLabel}`}
-                accessibilityRole="button"
-              >
-                <MaterialIcons name="filter-list" size={24} color={BRAND} />
-              </Pressable>
             </View>
           ),
         }}
@@ -287,7 +246,7 @@ export default function FrontpageScreen() {
 
       <View style={styles.fillContainer}>{renderBody()}</View>
 
-      <NavigationSheet />
+      <NavigationSheet sort={sort} onSortSelect={handleSortSelect} />
     </View>
   );
 }
@@ -342,31 +301,4 @@ const styles = StyleSheet.create({
   },
   headerBtnPressed: { opacity: 0.5 },
 
-  // ── Sort dropdown ─────────────────────────────────────────────────────────────
-  sortBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 999,
-  },
-  sortDropdown: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    borderRadius: 8,
-    elevation: 5,
-    zIndex: 1000,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    minWidth: 160,
-    overflow: 'hidden',
-  },
-  sortRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-  },
-  sortRowTextActive: { color: BRAND, fontWeight: '700' },
 });

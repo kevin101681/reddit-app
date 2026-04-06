@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+﻿import React, { useCallback, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
@@ -10,7 +10,6 @@ import {
   Alert,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getFavorites, removeFavorite } from '../utils/storage';
 import { Spacing, Typography, Radius } from '../constants/theme';
@@ -19,7 +18,21 @@ import { useTheme } from '../utils/ThemeContext';
 const BRAND    = '#7ba0b3';
 const FAB_SIZE = 56;
 
-export function NavigationSheet() {
+const SORT_OPTIONS = [
+  { label: 'Hot',           value: 'hot' },
+  { label: 'New',           value: 'new' },
+  { label: 'Top',           value: 'top' },
+  { label: 'Controversial', value: 'controversial' },
+] as const;
+
+interface NavigationSheetProps {
+  /** Current sort value — when provided, sort chips are shown at the top of the sheet. */
+  sort?: string;
+  /** Called with the chosen sort value; also closes the sheet automatically. */
+  onSortSelect?: (sort: string) => void;
+}
+
+export function NavigationSheet({ sort, onSortSelect }: NavigationSheetProps) {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
 
@@ -27,10 +40,8 @@ export function NavigationSheet() {
   const [menuInput, setMenuInput]   = useState('');
   const [favorites, setFavorites]   = useState<string[]>([]);
 
-  // ── FAB hide-on-scroll animation ─────────────────────────────────────────
   const fabTranslateY = useRef(new Animated.Value(0)).current;
 
-  // ── Favorites ─────────────────────────────────────────────────────────────
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -67,11 +78,17 @@ export function NavigationSheet() {
     }, 50);
   }
 
+  function handleSortChip(value: string) {
+    onSortSelect?.(value);
+    setIsMenuOpen(false);
+  }
+
   const fabBottom = Math.max(insets.bottom, Spacing.lg) + Spacing.lg;
+  const showSort  = !!sort && !!onSortSelect;
 
   return (
     <>
-      {/* Hide-on-scroll FAB */}
+      {/* FAB */}
       <Animated.View
         style={[
           styles.fab,
@@ -85,24 +102,17 @@ export function NavigationSheet() {
           accessibilityLabel="Open subreddit menu"
           accessibilityRole="button"
         >
-          <MaterialIcons name="explore" size={26} color="#fff" />
+          <Text style={styles.fabIcon}>⊕</Text>
         </Pressable>
       </Animated.View>
 
-      {/* Subreddit menu bottom sheet */}
       {isMenuOpen && (
         <>
-          {/* Scrim */}
-          <Pressable
-            style={styles.menuScrim}
-            onPress={() => setIsMenuOpen(false)}
-          />
+          <Pressable style={styles.menuScrim} onPress={() => setIsMenuOpen(false)} />
 
           <Animated.View style={[styles.menuPanel, { backgroundColor: theme.surface }]}>
-            {/* Drag handle */}
             <View style={[styles.menuHandle, { backgroundColor: theme.border }]} />
 
-            {/* Title row */}
             <View style={styles.menuHeader}>
               <Text style={[styles.menuTitle, { color: theme.text }]}>Subreddits</Text>
               <Pressable
@@ -120,13 +130,43 @@ export function NavigationSheet() {
               </Pressable>
             </View>
 
-            {/* Single ScrollView — search + favourites scroll together */}
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 16 }}
             >
-              {/* Search bar */}
+              {/* ── Sort By (only when sort props are provided) ───────────── */}
+              {showSort && (
+                <>
+                  <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>SORT BY</Text>
+                  <View style={styles.sortChips}>
+                    {SORT_OPTIONS.map((option) => (
+                      <Pressable
+                        key={option.value}
+                        style={[
+                          styles.sortChip,
+                          { borderColor: theme.border, backgroundColor: theme.background },
+                          sort === option.value && styles.sortChipActive,
+                        ]}
+                        onPress={() => handleSortChip(option.value)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Sort by ${option.label}`}
+                        accessibilityState={{ selected: sort === option.value }}
+                      >
+                        <Text style={[
+                          styles.sortChipText,
+                          { color: theme.textMuted },
+                          sort === option.value && styles.sortChipTextActive,
+                        ]}>
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              )}
+
+              {/* ── Subreddit search ─────────────────────────────────────── */}
               <View style={styles.searchRow}>
                 <TextInput
                   style={[styles.searchInput, {
@@ -151,7 +191,7 @@ export function NavigationSheet() {
                 </Pressable>
               </View>
 
-              {/* Favourites */}
+              {/* ── Favourites ────────────────────────────────────────────── */}
               <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
                 {favorites.length === 0 ? 'NO FAVOURITES YET' : 'FAVOURITES'}
               </Text>
@@ -222,6 +262,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
   },
   fabBtnPressed: { opacity: 0.85 },
+  fabIcon: { fontSize: 26, color: '#fff' },
 
   menuScrim: {
     ...StyleSheet.absoluteFillObject,
@@ -233,11 +274,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    margin: 0,
     zIndex: 100,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '70%' as any,
+    maxHeight: '75%' as any,
     paddingTop: 12,
   },
   menuHandle: {
@@ -270,6 +310,33 @@ const styles = StyleSheet.create({
     fontSize: Typography.md,
     lineHeight: 18,
   },
+
+  // ── Sort chips ────────────────────────────────────────────────────────────
+  sortChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  sortChip: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+  },
+  sortChipActive: {
+    backgroundColor: BRAND,
+    borderColor: BRAND,
+  },
+  sortChipText: {
+    fontSize: Typography.sm,
+    fontWeight: '600',
+  },
+  sortChipTextActive: {
+    color: '#fff',
+  },
+
+  // ── Search ────────────────────────────────────────────────────────────────
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -292,6 +359,8 @@ const styles = StyleSheet.create({
   },
   goBtnPressed: { opacity: 0.8 },
   goBtnText: { color: '#fff', fontWeight: '700', fontSize: Typography.md },
+
+  // ── Favourites ────────────────────────────────────────────────────────────
   sectionLabel: {
     fontSize: Typography.xs,
     fontWeight: '700',

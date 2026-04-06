@@ -19,6 +19,10 @@ const DEPTH_COLORS = [
 function depthColor(depth: number): string {
   return DEPTH_COLORS[depth % DEPTH_COLORS.length];
 }
+// Matches bare image URLs on their own line (Reddit CDN + common image hosts).
+// These are stripped from the Markdown body text so they don't render as plain
+// text links alongside the inline <Image> previews already rendered below.
+const BARE_IMAGE_RE = /^\s*https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|gifv|webp|mp4)(?:\?[^\s]*)?\s*$/gim;
 
 function openLink(url: string): boolean {
   Linking.openURL(url).catch(() => {});
@@ -27,8 +31,8 @@ function openLink(url: string): boolean {
 
 function useCommentMdStyles(depth: number) {
   return useMemo(() => {
-    const fontSize   = Math.max(Typography.xs, Typography.sm - Math.floor(depth / 3));
-    const lineHeight = fontSize + 7;
+    const fontSize   = Math.max(Typography.sm, Typography.md - Math.floor(depth / 3));
+    const lineHeight = fontSize + 9;
     return buildMarkdownStyles({ fontSize, lineHeight });
   }, [depth]);
 }
@@ -57,6 +61,16 @@ export const CommentThread = memo(function CommentThread({
   const nestedStyle = depth > 0
     ? { borderLeftWidth: 3, borderLeftColor: color, paddingLeft: Spacing.sm }
     : undefined;
+
+  // Strip bare image URL lines and markdown image syntax from the body so they
+  // don't appear as plain-text links alongside the inline Image previews.
+  const extractedImageRe = /(https?:\/\/(?:preview\.redd\.it|i\.redd\.it)[^\s)]+)/g;
+  const cleanBody = comment.body
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+    .replace(extractedImageRe, '')
+    .replace(BARE_IMAGE_RE, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
   // ── Collapsed: show only the depth border + blank tap target ─────────────
   if (isCollapsed) {
@@ -91,7 +105,7 @@ export const CommentThread = memo(function CommentThread({
           onLinkPress={openLink}
           rules={suppressImageRule}
         >
-          {comment.body}
+          {cleanBody}
         </Markdown>
 
         {/* Inline Reddit images from the comment body */}

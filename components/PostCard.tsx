@@ -29,7 +29,6 @@ interface PostCardProps {
 
 function PostCardInner({ post, activePostId, viewMode = 'standard' }: PostCardProps) {
   const { theme } = useTheme();
-  const [isMuted, setIsMuted] = useState(true);
   const [isTextExpanded, setIsTextExpanded] = useState(false);
   const videoRef = useRef<Video>(null);
 
@@ -117,23 +116,6 @@ function PostCardInner({ post, activePostId, viewMode = 'standard' }: PostCardPr
           {post.subreddit_name_prefixed}
         </Text>
 
-        {/* Mute toggle — video posts only */}
-        {showVideo && (
-          <Pressable
-            onPress={() => setIsMuted((prev) => !prev)}
-            hitSlop={10}
-            style={styles.footerBtn}
-            accessibilityLabel={isMuted ? 'Unmute video' : 'Mute video'}
-            accessibilityRole="button"
-          >
-            <MaterialIcons
-              name={isMuted ? 'volume-off' : 'volume-up'}
-              size={20}
-              color={BRAND}
-            />
-          </Pressable>
-        )}
-
         {/* Expand/collapse chevron — text posts only */}
         {isTypeC && (
           <Pressable
@@ -207,7 +189,8 @@ function PostCardInner({ post, activePostId, viewMode = 'standard' }: PostCardPr
               style={styles.video}
               shouldPlay={activePostId === post.id}
               isLooping
-              isMuted={isMuted}
+              isMuted
+              useNativeControls
               resizeMode={ResizeMode.CONTAIN}
             />
           </View>
