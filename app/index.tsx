@@ -129,9 +129,9 @@ export default function FrontpageScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: RedditPost }) => (
-      <PostCard post={item} activePostId={activePostId} viewMode={viewMode} />
+      <PostCard post={item} activePostId={activePostId} viewMode={viewMode} currentTheme={theme} />
     ),
-    [activePostId, viewMode]
+    [activePostId, viewMode, theme]
   );
 
   // ── Render ────────────────────────────────────────────────────────────────────
