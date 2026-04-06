@@ -3,33 +3,29 @@ import { View, Text, Pressable, StyleSheet, Linking } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { RedditComment } from '../utils/types';
 import { buildMarkdownStyles, suppressImageRule } from '../utils/markdownStyles';
-import { Colors, Spacing, Typography } from '../constants/theme';
+import { Typography, Spacing } from '../constants/theme';
 
-// Cold-theme depth palette — cycles seamlessly via modulo for deeper nesting.
+const BRAND = '#7ba0b3';
+
+// Cold-tone depth palette — cycles via modulo for deeper nesting
 const DEPTH_COLORS = [
-  '#7ba0b3', // 0 — brand / lightest
+  '#7ba0b3', // 0
   '#5a879d', // 1
   '#457287', // 2
   '#345e72', // 3
   '#264a5c', // 4
-  '#1b3847', // 5 — deepest oceanic
+  '#1b3847', // 5+
 ];
 
 function depthColor(depth: number): string {
   return DEPTH_COLORS[depth % DEPTH_COLORS.length];
 }
 
-/** All tapped links open externally in the device browser. */
 function openLink(url: string): boolean {
   Linking.openURL(url).catch(() => {});
   return true;
 }
 
-/**
- * Memoised markdown styles per nesting depth.
- * Font size shrinks slightly at deeper levels so text stays readable
- * inside narrow indented columns.
- */
 function useCommentMdStyles(depth: number) {
   return useMemo(() => {
     const fontSize   = Math.max(Typography.xs, Typography.sm - Math.floor(depth / 3));
@@ -50,58 +46,45 @@ export const CommentThread = memo(function CommentThread({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const mdStyles = useCommentMdStyles(depth);
 
-  // Skip deleted / removed bodies entirely
-  if (
-    !comment.body ||
-    comment.body === '[deleted]' ||
-    comment.body === '[removed]'
-  ) {
+  if (!comment.body || comment.body === '[deleted]' || comment.body === '[removed]') {
     return null;
   }
 
   const color      = depthColor(depth);
   const replyCount = comment.replies?.length ?? 0;
 
-  // Each nesting level adds a coloured left border + a single paddingLeft step.
+  // Left border encodes nesting depth; no margin stacking so wide nesting stays readable
   const nestedStyle = depth > 0
     ? { borderLeftWidth: 3, borderLeftColor: color, paddingLeft: Spacing.sm }
     : undefined;
 
-  if (isCollapsed) {
-    return (
-      <Pressable
-        onPress={() => setIsCollapsed(false)}
-        style={{ paddingVertical: 8, paddingHorizontal: 12 }}
-        accessibilityRole="button"
-        accessibilityLabel="Expand comment"
-      >
-        <Text style={{ color: '#7ba0b3', fontWeight: 'bold' }}>[+] {comment.author}</Text>
-      </Pressable>
-    );
-  }
-
   return (
     <View style={[styles.container, nestedStyle]}>
+
+      {/* ── Toggle header — ONLY this row is tappable ───────────────────── */}
       <Pressable
-        onPress={() => setIsCollapsed(true)}
-        hitSlop={4}
+        onPress={() => setIsCollapsed((c) => !c)}
         accessibilityRole="button"
-        accessibilityLabel="Collapse comment"
+        accessibilityLabel={isCollapsed ? 'Expand comment' : 'Collapse comment'}
       >
-        <View style={styles.card}>
-          <View style={styles.bodyWrap}>
-            <Markdown
-              style={mdStyles}
-              onLinkPress={openLink}
-              rules={suppressImageRule}
-            >
-              {comment.body}
-            </Markdown>
-          </View>
-        </View>
+        <Text style={styles.header}>
+          {isCollapsed ? '[+]' : '[-]'} {comment.author}
+        </Text>
       </Pressable>
 
-      {replyCount > 0 && (
+      {/* ── Body — plain Markdown, no wrapping Pressable, no extra spacing ─ */}
+      {!isCollapsed && (
+        <Markdown
+          style={mdStyles}
+          onLinkPress={openLink}
+          rules={suppressImageRule}
+        >
+          {comment.body}
+        </Markdown>
+      )}
+
+      {/* ── Recursive replies ────────────────────────────────────────────── */}
+      {!isCollapsed && replyCount > 0 && (
         <View style={styles.replies}>
           {comment.replies!.map((reply) => (
             <CommentThread
@@ -112,6 +95,7 @@ export const CommentThread = memo(function CommentThread({
           ))}
         </View>
       )}
+
     </View>
   );
 });
@@ -119,17 +103,12 @@ export const CommentThread = memo(function CommentThread({
 const styles = StyleSheet.create({
   container: {
     marginTop: Spacing.sm,
-    paddingTop: Spacing.xs,
   },
-  card: {
-    backgroundColor: '#1E1E1E',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-  },
-  bodyWrap: {
-    flex: 1,
-    flexShrink: 1,
+  header: {
+    color: BRAND,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    paddingVertical: 4,
   },
   replies: {
     marginTop: Spacing.xs,
