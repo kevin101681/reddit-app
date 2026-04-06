@@ -83,3 +83,34 @@ export async function setSortPreference(sort: string, subreddit = 'all'): Promis
     // Storage errors are non-fatal; silently ignore
   }
 }
+
+// ─── Theme preference ─────────────────────────────────────────────────────────
+
+const KEY_THEME = '@personal_reddit:theme';
+const VALID_THEMES = ['light', 'dark'] as const;
+export type ThemeName = typeof VALID_THEMES[number];
+
+/**
+ * Return the persisted theme preference.
+ * Defaults to "dark" if nothing is stored or the stored value is invalid.
+ */
+export async function getThemePreference(): Promise<ThemeName> {
+  try {
+    const raw = await AsyncStorage.getItem(KEY_THEME);
+    if (raw && (VALID_THEMES as readonly string[]).includes(raw)) return raw as ThemeName;
+    return 'dark';
+  } catch {
+    return 'dark';
+  }
+}
+
+/**
+ * Persist the active theme preference.
+ */
+export async function setThemePreference(theme: ThemeName): Promise<void> {
+  try {
+    await AsyncStorage.setItem(KEY_THEME, theme);
+  } catch {
+    // Storage errors are non-fatal; silently ignore
+  }
+}

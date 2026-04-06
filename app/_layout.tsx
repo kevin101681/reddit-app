@@ -1,22 +1,26 @@
 ﻿import { Platform, UIManager } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Colors } from '../constants/theme';
+import { ThemeProvider, useTheme } from '../utils/ThemeContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-export default function RootLayout() {
+function RootStack() {
+  const { theme, themeName } = useTheme();
   return (
     <>
-      <StatusBar style="light" backgroundColor={Colors.background} />
+      <StatusBar
+        style={themeName === 'dark' ? 'light' : 'dark'}
+        backgroundColor={theme.background}
+      />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: Colors.surface },
-          headerTintColor: Colors.text,
-          headerTitleStyle: { fontWeight: '700', color: Colors.text },
-          contentStyle: { backgroundColor: Colors.background },
+          headerStyle: { backgroundColor: theme.surface },
+          headerTintColor: theme.text,
+          headerTitleStyle: { fontWeight: '700', color: theme.text },
+          contentStyle: { backgroundColor: theme.background },
           animation: 'slide_from_right',
           gestureEnabled: true,
           fullScreenGestureEnabled: true,
@@ -40,5 +44,13 @@ export default function RootLayout() {
         />
       </Stack>
     </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootStack />
+    </ThemeProvider>
   );
 }
