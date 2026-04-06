@@ -26,6 +26,19 @@ async function redditFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
     throw new Error("API Error: " + response.status);
   }
 
+  // allorigins /get always returns a JSON envelope:
+  //   { contents: "<raw response body>", status: { http_code: 200, ... } }
+  // Unwrap it on web so the rest of the code sees plain Reddit JSON.
+  // On native we hit Reddit directly and parse the response as-is.
+  if (Platform.OS === "web") {
+    const wrapper = await response.json() as { contents: string; status: { http_code: number } };
+    if (wrapper.status.http_code !== 200) {
+      console.error("[API ERROR] allorigins upstream " + wrapper.status.http_code + ":", url);
+      throw new Error("API Error: " + wrapper.status.http_code);
+    }
+    return JSON.parse(wrapper.contents) as T;
+  }
+
   return response.json() as Promise<T>;
 }
 
@@ -117,7 +130,7 @@ export async function getPosts(
 
   // 2. On web only: route through allorigins.win to bypass CORS and datacenter IP blocks
   if (Platform.OS === "web") {
-    endpoint = "https://api.allorigins.win/raw?url=" + encodeURIComponent(endpoint);
+    endpoint = "https://api.allorigins.win/get?url=" + encodeURIComponent(endpoint);
   }
 
   const raw = await redditFetch<any>(endpoint, signal);
@@ -151,7 +164,7 @@ export async function getComments(
 
   // 2. On web only: route through allorigins.win to bypass CORS and datacenter IP blocks
   if (Platform.OS === "web") {
-    endpoint = "https://api.allorigins.win/raw?url=" + encodeURIComponent(endpoint);
+    endpoint = "https://api.allorigins.win/get?url=" + encodeURIComponent(endpoint);
   }
 
   const raw = await redditFetch<any[]>(endpoint, signal);
