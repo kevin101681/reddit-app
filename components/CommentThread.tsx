@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet, Linking } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { RedditComment } from '../utils/types';
 import { buildMarkdownStyles, suppressImageRule } from '../utils/markdownStyles';
-import { Typography, Spacing } from '../constants/theme';
+import { Colors, Typography, Spacing, Radius } from '../constants/theme';
 
 const BRAND = '#7ba0b3';
 
@@ -53,37 +53,50 @@ export const CommentThread = memo(function CommentThread({
   const color      = depthColor(depth);
   const replyCount = comment.replies?.length ?? 0;
 
-  // Left border encodes nesting depth; no margin stacking so wide nesting stays readable
+  // Left border encodes nesting depth; no margin stacking keeps deep nesting readable
   const nestedStyle = depth > 0
     ? { borderLeftWidth: 3, borderLeftColor: color, paddingLeft: Spacing.sm }
     : undefined;
 
   return (
+    // ── Depth indicator ───────────────────────────────────────────────────────
     <View style={[styles.container, nestedStyle]}>
 
-      {/* ── Toggle header — ONLY this row is tappable ───────────────────── */}
-      <Pressable
-        onPress={() => setIsCollapsed((c) => !c)}
-        accessibilityRole="button"
-        accessibilityLabel={isCollapsed ? 'Expand comment' : 'Collapse comment'}
-      >
-        <Text style={styles.header}>
-          {isCollapsed ? '[+]' : '[-]'} {comment.author}
-        </Text>
-      </Pressable>
+      {/*
+        ── Material Card ─────────────────────────────────────────────────────
+        Plain View — NOT a Pressable. Only the header row inside is tappable.
+      */}
+      <View style={styles.card}>
 
-      {/* ── Body — plain Markdown, no wrapping Pressable, no extra spacing ─ */}
-      {!isCollapsed && (
-        <Markdown
-          style={mdStyles}
-          onLinkPress={openLink}
-          rules={suppressImageRule}
+        {/* Toggle header — the ONLY tappable surface */}
+        <Pressable
+          onPress={() => setIsCollapsed((c) => !c)}
+          accessibilityRole="button"
+          accessibilityLabel={isCollapsed ? 'Expand comment' : 'Collapse comment'}
+          hitSlop={4}
         >
-          {comment.body}
-        </Markdown>
-      )}
+          <Text style={styles.header}>
+            {isCollapsed ? '[+]' : '[-]'} {comment.author}
+          </Text>
+        </Pressable>
 
-      {/* ── Recursive replies ────────────────────────────────────────────── */}
+        {/* Comment body — plain Markdown, no wrapping Pressable */}
+        {!isCollapsed && (
+          <Markdown
+            style={mdStyles}
+            onLinkPress={openLink}
+            rules={suppressImageRule}
+          >
+            {comment.body}
+          </Markdown>
+        )}
+
+      </View>
+
+      {/*
+        ── Recursive replies — outside the card so they form their own
+        indented chain visually detached from the parent card.
+      */}
       {!isCollapsed && replyCount > 0 && (
         <View style={styles.replies}>
           {comment.replies!.map((reply) => (
@@ -103,6 +116,12 @@ export const CommentThread = memo(function CommentThread({
 const styles = StyleSheet.create({
   container: {
     marginTop: Spacing.sm,
+  },
+  card: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
   },
   header: {
     color: BRAND,

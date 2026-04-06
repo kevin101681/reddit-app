@@ -55,6 +55,15 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
     !!post.selftext &&
     post.selftext.trim().length > 0;
 
+  // Derive aspect ratio from the source image dimensions so `contain` has a
+  // real container height to work against. Falls back to 16:9 for posts that
+  // lack preview metadata (e.g. some link posts).
+  const sourceImg = post.preview?.images?.[0]?.source;
+  const imageAspectRatio =
+    sourceImg?.width && sourceImg?.height
+      ? sourceImg.width / sourceImg.height
+      : 16 / 9;
+
   // ── Navigation ──────────────────────────────────────────────────────────────
   function handlePress() {
     router.push({
@@ -84,8 +93,6 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
   return (
     <Pressable
       onPress={handlePress}
-      // delayPressIn prevents the press state flickering during fast scrolls.
-      // No opacity change on press — visual feedback comes from android_ripple only.
       android_ripple={{ color: Colors.primaryMuted }}
       style={styles.card}
     >
@@ -98,17 +105,20 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
       {showVideo ? (
         <Video
           source={{ uri: videoUrl! }}
-          style={styles.media}
+          style={styles.video}
           shouldPlay={activePostId === post.id}
           isLooping
           isMuted
-          resizeMode={ResizeMode.COVER}
+          resizeMode={ResizeMode.CONTAIN}
         />
       ) : showImage ? (
+        // aspectRatio derived from the source image so `contain` renders
+        // the full image without cropping or collapsing to 0 height.
+        // maxHeight caps extreme portrait/infographic images.
         <Image
           source={{ uri: imageUrl! }}
-          style={styles.media}
-          resizeMode="cover"
+          style={[styles.image, { aspectRatio: imageAspectRatio }]}
+          resizeMode="contain"
         />
       ) : showSelftext ? (
         <Text style={styles.selftext} numberOfLines={3}>
@@ -152,9 +162,19 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: Spacing.sm,
   },
-  media: {
+  // Fixed-height video container — video content fills it via CONTAIN
+  video: {
     width: '100%',
     height: 220,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.sm,
+    backgroundColor: Colors.border,
+  },
+  // Image: no fixed height — aspectRatio applied inline; maxHeight caps
+  // portrait images so an infographic never takes over the whole screen.
+  image: {
+    width: '100%',
+    maxHeight: 400,
     borderRadius: Radius.md,
     marginBottom: Spacing.sm,
     backgroundColor: Colors.border,
