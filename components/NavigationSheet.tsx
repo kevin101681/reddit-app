@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getFavorites, removeFavorite } from '../utils/storage';
 import { Spacing, Typography, Radius } from '../constants/theme';
@@ -26,15 +27,20 @@ const SORT_OPTIONS = [
 ] as const;
 
 interface NavigationSheetProps {
-  /** Current sort value — when provided, sort chips are shown at the top of the sheet. */
   sort?: string;
-  /** Called with the chosen sort value; also closes the sheet automatically. */
   onSortSelect?: (sort: string) => void;
+  viewMode?: 'standard' | 'compact';
+  onViewModeToggle?: () => void;
 }
 
-export function NavigationSheet({ sort, onSortSelect }: NavigationSheetProps) {
+export function NavigationSheet({
+  sort,
+  onSortSelect,
+  viewMode,
+  onViewModeToggle,
+}: NavigationSheetProps) {
   const insets = useSafeAreaInsets();
-  const { theme } = useTheme();
+  const { theme, themeName, toggleTheme } = useTheme();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuInput, setMenuInput]   = useState('');
@@ -113,8 +119,8 @@ export function NavigationSheet({ sort, onSortSelect }: NavigationSheetProps) {
           <Animated.View style={[styles.menuPanel, { backgroundColor: theme.surface }]}>
             <View style={[styles.menuHandle, { backgroundColor: theme.border }]} />
 
+            {/* Header row — close button only, title text removed */}
             <View style={styles.menuHeader}>
-              <Text style={[styles.menuTitle, { color: theme.text }]}>Subreddits</Text>
               <Pressable
                 style={({ pressed }) => [
                   styles.menuClose,
@@ -135,7 +141,44 @@ export function NavigationSheet({ sort, onSortSelect }: NavigationSheetProps) {
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 16 }}
             >
-              {/* ── Sort By (only when sort props are provided) ───────────── */}
+              {/* ── Theme & View Mode toggles ─────────────────────────────── */}
+              <View style={styles.controlRow}>
+                <Pressable
+                  style={[styles.controlBtn, { borderColor: theme.border, backgroundColor: theme.background }]}
+                  onPress={toggleTheme}
+                  accessibilityRole="button"
+                  accessibilityLabel={themeName === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  <MaterialIcons
+                    name={themeName === 'dark' ? 'light-mode' : 'dark-mode'}
+                    size={20}
+                    color={BRAND}
+                  />
+                  <Text style={[styles.controlLabel, { color: theme.textMuted }]}>
+                    {themeName === 'dark' ? 'Light' : 'Dark'}
+                  </Text>
+                </Pressable>
+
+                {onViewModeToggle && (
+                  <Pressable
+                    style={[styles.controlBtn, { borderColor: theme.border, backgroundColor: theme.background }]}
+                    onPress={() => { onViewModeToggle(); setIsMenuOpen(false); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={viewMode === 'standard' ? 'Switch to compact view' : 'Switch to standard view'}
+                  >
+                    <MaterialIcons
+                      name={viewMode === 'standard' ? 'view-list' : 'view-agenda'}
+                      size={20}
+                      color={BRAND}
+                    />
+                    <Text style={[styles.controlLabel, { color: theme.textMuted }]}>
+                      {viewMode === 'standard' ? 'Compact' : 'Standard'}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+
+              {/* ── Sort By ───────────────────────────────────────────────── */}
               {showSort && (
                 <>
                   <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>SORT BY</Text>
@@ -166,7 +209,7 @@ export function NavigationSheet({ sort, onSortSelect }: NavigationSheetProps) {
                 </>
               )}
 
-              {/* ── Subreddit search ─────────────────────────────────────── */}
+              {/* ── Subreddit search — no placeholder ────────────────────── */}
               <View style={styles.searchRow}>
                 <TextInput
                   style={[styles.searchInput, {
@@ -174,7 +217,6 @@ export function NavigationSheet({ sort, onSortSelect }: NavigationSheetProps) {
                     color: theme.text,
                     borderColor: theme.border,
                   }]}
-                  placeholder="r/subreddit name…"
                   placeholderTextColor={theme.textMuted}
                   value={menuInput}
                   onChangeText={setMenuInput}
@@ -191,8 +233,8 @@ export function NavigationSheet({ sort, onSortSelect }: NavigationSheetProps) {
                 </Pressable>
               </View>
 
-              {/* ── Favourites ────────────────────────────────────────────── */}
-              <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
+              {/* ── Favourites — muted grey label ─────────────────────────── */}
+              <Text style={styles.favSectionLabel}>
                 {favorites.length === 0 ? 'NO FAVOURITES YET' : 'FAVOURITES'}
               </Text>
 
@@ -219,12 +261,15 @@ export function NavigationSheet({ sort, onSortSelect }: NavigationSheetProps) {
                           <Text style={[styles.favName, { color: theme.text }]}>r/{fav}</Text>
                           <Text style={[styles.favChevron, { color: theme.textMuted }]}>›</Text>
                         </Pressable>
+                        {/* Task 5 — Material trash icon */}
                         <Pressable
                           style={({ pressed }) => [styles.favDelete, pressed && styles.favDeletePressed]}
                           onPress={() => handleDeleteFavorite(fav)}
                           hitSlop={8}
+                          accessibilityLabel={`Remove r/${fav} from favourites`}
+                          accessibilityRole="button"
                         >
-                          <Text style={styles.favDeleteIcon}>🗑</Text>
+                          <MaterialIcons name="delete-outline" size={24} color="#888" />
                         </Pressable>
                       </View>
                       {index < favorites.length - 1 && (
@@ -277,7 +322,7 @@ const styles = StyleSheet.create({
     zIndex: 100,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '75%' as any,
+    maxHeight: '80%' as any,
     paddingTop: 12,
   },
   menuHandle: {
@@ -288,15 +333,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   menuHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     paddingHorizontal: 20,
-    marginBottom: Spacing.sm,
-  },
-  menuTitle: {
-    flex: 1,
-    fontSize: Typography.lg,
-    fontWeight: '700',
+    marginBottom: Spacing.xs,
   },
   menuClose: {
     width: 30,
@@ -311,7 +350,35 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
+  // ── Theme & View mode toggles ─────────────────────────────────────────────
+  controlRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  controlBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  controlLabel: {
+    fontSize: Typography.sm,
+    fontWeight: '600',
+  },
+
   // ── Sort chips ────────────────────────────────────────────────────────────
+  sectionLabel: {
+    fontSize: Typography.xs,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: Spacing.xs,
+    marginTop: Spacing.xs,
+  },
   sortChips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -361,12 +428,14 @@ const styles = StyleSheet.create({
   goBtnText: { color: '#fff', fontWeight: '700', fontSize: Typography.md },
 
   // ── Favourites ────────────────────────────────────────────────────────────
-  sectionLabel: {
+  // Fixed muted grey — independent of theme per Task 7
+  favSectionLabel: {
     fontSize: Typography.xs,
     fontWeight: '700',
     letterSpacing: 1,
     marginBottom: Spacing.xs,
     marginTop: Spacing.xs,
+    color: '#666666',
   },
   emptyState: {
     alignItems: 'center',
@@ -416,7 +485,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
   },
   favDeletePressed: { opacity: 0.4 },
-  favDeleteIcon: { fontSize: 18 },
   favSeparator: {
     height: StyleSheet.hairlineWidth,
     marginLeft: Spacing.lg,

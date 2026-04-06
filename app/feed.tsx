@@ -18,7 +18,7 @@ import { getPosts } from '../utils/api';
 import { RedditPost } from '../utils/types';
 import { PostCard } from '../components/PostCard';
 import { FeedSkeleton } from '../components/SkeletonLoader';
-import { getFavorites, addFavorite, removeFavorite, getSortPreference, setSortPreference } from '../utils/storage';
+import { getFavorites, addFavorite, removeFavorite, getSortPreference, setSortPreference, getViewModePreference, setViewModePreference } from '../utils/storage';
 import { Colors, Spacing, Typography } from '../constants/theme';
 import { useTheme } from '../utils/ThemeContext';
 import { NavigationSheet } from '../components/NavigationSheet';
@@ -52,7 +52,11 @@ export default function FeedScreen() {
 
   useEffect(() => {
     let active = true;
-    getSortPreference(sub).then((s) => { if (active) setSort(s); });
+    Promise.all([getSortPreference(sub), getViewModePreference(sub)]).then(([s, v]) => {
+      if (!active) return;
+      setSort(s);
+      setViewMode(v as 'standard' | 'compact');
+    });
     return () => { active = false; };
   }, [sub]);
 
@@ -201,7 +205,7 @@ export default function FeedScreen() {
 
               {/* View mode toggle */}
               <Pressable
-                onPress={() => setViewMode((m) => m === 'standard' ? 'compact' : 'standard')}
+                onPress={() => setViewMode((m) => { const next = m === 'standard' ? 'compact' : 'standard'; setViewModePreference(next, sub); return next; })}
                 style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
                 hitSlop={8}
                 accessibilityLabel={viewMode === 'standard' ? 'Switch to compact view' : 'Switch to standard view'}

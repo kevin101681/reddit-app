@@ -114,3 +114,37 @@ export async function setThemePreference(theme: ThemeName): Promise<void> {
     // Storage errors are non-fatal; silently ignore
   }
 }
+// ─── View-mode (card style) preference ───────────────────────────────────────
+
+function styleKey(subreddit: string): string {
+  const normalized = subreddit.toLowerCase().trim().replace(/^r\//i, '') || 'all';
+  return `@personal_reddit:style_${normalized}`;
+}
+
+const VALID_VIEW_MODES = ['standard', 'compact'] as const;
+export type ViewMode = (typeof VALID_VIEW_MODES)[number];
+
+/**
+ * Return the persisted card-style preference for a specific subreddit.
+ * Defaults to "standard" if nothing is stored or the value is invalid.
+ */
+export async function getViewModePreference(subreddit = 'all'): Promise<ViewMode> {
+  try {
+    const raw = await AsyncStorage.getItem(styleKey(subreddit));
+    if (raw && (VALID_VIEW_MODES as readonly string[]).includes(raw)) return raw as ViewMode;
+    return 'standard';
+  } catch {
+    return 'standard';
+  }
+}
+
+/**
+ * Persist the card-style preference for a specific subreddit.
+ */
+export async function setViewModePreference(viewMode: ViewMode, subreddit = 'all'): Promise<void> {
+  try {
+    await AsyncStorage.setItem(styleKey(subreddit), viewMode);
+  } catch {
+    // Storage errors are non-fatal; silently ignore
+  }
+}

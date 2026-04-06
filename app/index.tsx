@@ -1,7 +1,6 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
-  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -10,47 +9,40 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Stack } from 'expo-router';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getPosts } from '../utils/api';
 import { RedditPost } from '../utils/types';
 import { PostCard } from '../components/PostCard';
 import { FeedSkeleton } from '../components/SkeletonLoader';
-import { getSortPreference, setSortPreference } from '../utils/storage';
+import {
+  getSortPreference,
+  setSortPreference,
+  getViewModePreference,
+  setViewModePreference,
+} from '../utils/storage';
 import { Colors, Spacing, Typography } from '../constants/theme';
 import { useTheme } from '../utils/ThemeContext';
 import { NavigationSheet } from '../components/NavigationSheet';
 
 const SUBREDDIT = 'all';
 const BRAND     = '#7ba0b3';
-const FAB_SIZE  = 56; // used for list bottom padding clearance
-
-const SORT_OPTIONS = [
-  { label: 'Hot',           value: 'hot' },
-  { label: 'New',           value: 'new' },
-  { label: 'Top',           value: 'top' },
-  { label: 'Controversial', value: 'controversial' },
-] as const;
+const FAB_SIZE  = 56;
 
 export default function FrontpageScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, themeName, toggleTheme } = useTheme();
+  const { theme, themeName } = useTheme();
 
-  const [sort, setSort]             = useState('hot');
-  const [posts, setPosts]           = useState<RedditPost[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [sort, setSort]               = useState('hot');
+  const [viewMode, setViewMode]       = useState<'standard' | 'compact'>('standard');
+  const [posts, setPosts]             = useState<RedditPost[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [refreshing, setRefreshing]   = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [after, setAfter]           = useState<string | undefined>(undefined);
-  const [hasMore, setHasMore]       = useState(true);
-  const [error, setError]           = useState<string | null>(null);
+  const [after, setAfter]             = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-
-
-
-  // ── View mode ────────────────────────────────────────────────────────────────
-  const [viewMode, setViewMode] = useState<'standard' | 'compact'>('standard');
 
   // ── Viewability ───────────────────────────────────────────────────────────────
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
@@ -61,17 +53,31 @@ export default function FrontpageScreen() {
     }
   ).current;
 
-
-  // ── Sort ──────────────────────────────────────────────────────────────────────
+  // ── Load persisted preferences ────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
-    getSortPreference(SUBREDDIT).then((s) => { if (active) setSort(s); });
+    Promise.all([
+      getSortPreference(SUBREDDIT),
+      getViewModePreference(SUBREDDIT),
+    ]).then(([s, v]) => {
+      if (!active) return;
+      setSort(s);
+      setViewMode(v);
+    });
     return () => { active = false; };
   }, []);
 
   const handleSortSelect = useCallback(async (newSort: string) => {
     setSortPreference(newSort, SUBREDDIT);
     setSort(newSort);
+  }, []);
+
+  const handleViewModeToggle = useCallback(() => {
+    setViewMode((prev) => {
+      const next = prev === 'standard' ? 'compact' : 'standard';
+      setViewModePreference(next, SUBREDDIT);
+      return next;
+    });
   }, []);
 
   // ── Data fetching ─────────────────────────────────────────────────────────────
@@ -129,7 +135,6 @@ export default function FrontpageScreen() {
   );
 
   // ── Render ────────────────────────────────────────────────────────────────────
-
   const renderBody = () => {
     if (loading) {
       return (
@@ -193,17 +198,13 @@ export default function FrontpageScreen() {
             ) : null
           }
         />
-
       </View>
     );
   };
 
   return (
-    // Plain View — extends to the physical screen edges.
-    // expo-router's Stack.Screen handles the top safe area natively via the
-    // header; no paddingTop needed here. Bottom stays at 0 so the absolute
-    // menu panel anchors flush to the physical screen edge.
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
+      {/* Header — no buttons; theme/view controls live in the FAB menu */}
       <Stack.Screen
         options={{
           title: 'r/all',
@@ -211,59 +212,28 @@ export default function FrontpageScreen() {
           headerTintColor: theme.text,
           headerTitleStyle: { fontWeight: '700', color: theme.text },
           headerShown: true,
-          headerRight: () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Pressable
-                onPress={toggleTheme}
-                style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
-                hitSlop={8}
-                accessibilityLabel={themeName === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                accessibilityRole="button"
-              >
-                <MaterialIcons
-                  name={themeName === 'dark' ? 'light-mode' : 'dark-mode'}
-                  size={22}
-                  color={BRAND}
-                />
-              </Pressable>
-              <Pressable
-                onPress={() => setViewMode((m) => m === 'standard' ? 'compact' : 'standard')}
-                style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
-                hitSlop={8}
-                accessibilityLabel={viewMode === 'standard' ? 'Switch to compact view' : 'Switch to standard view'}
-                accessibilityRole="button"
-              >
-                <MaterialIcons
-                  name={viewMode === 'standard' ? 'view-list' : 'view-agenda'}
-                  size={22}
-                  color={BRAND}
-                />
-              </Pressable>
-            </View>
-          ),
         }}
       />
 
       <View style={styles.fillContainer}>{renderBody()}</View>
 
-      <NavigationSheet sort={sort} onSortSelect={handleSortSelect} />
+      <NavigationSheet
+        sort={sort}
+        onSortSelect={handleSortSelect}
+        viewMode={viewMode}
+        onViewModeToggle={handleViewModeToggle}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // Root View — no SafeAreaView; touches physical screen edges.
-  // Background color applied inline from theme so it updates on toggle.
-  screen: {
-    flex: 1,
-  },
+  screen: { flex: 1 },
   fillContainer: {
     flex: 1,
     backgroundColor: Colors.background,
   },
-  listContent: {
-    paddingTop: Spacing.sm,
-  },
+  listContent: { paddingTop: Spacing.sm },
   center: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -294,11 +264,4 @@ const styles = StyleSheet.create({
   },
   errorBannerText: { color: Colors.textMuted, fontSize: Typography.sm },
   loadingMore: { paddingVertical: Spacing.xl },
-  headerBtn: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  headerBtnPressed: { opacity: 0.5 },
-
 });
