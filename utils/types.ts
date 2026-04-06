@@ -35,6 +35,7 @@ export interface RedditPost {
     };
   } | null;
   selftext: string;
+  is_self: boolean;
   is_video: boolean;
   created_utc: number;
   upvote_ratio: number;

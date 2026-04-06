@@ -52,6 +52,7 @@ function normalizePost(child: any): RedditPost | null {
     preview:                 d.preview,
     secure_media:            d.secure_media ?? null,
     selftext:                d.selftext   ?? '',
+    is_self:                 d.is_self    ?? false,
     is_video:                d.is_video   ?? false,
     created_utc:             d.created_utc ?? 0,
     upvote_ratio:            d.upvote_ratio ?? 0,

@@ -4,6 +4,7 @@ import {
   Text,
   Pressable,
   Image,
+  Linking,
   StyleSheet,
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
@@ -14,6 +15,9 @@ import { Colors, Spacing, Typography, Radius } from '../constants/theme';
 
 const BRAND = '#7ba0b3';
 
+// Thumbnails whose value is a sentinel string rather than a real URL
+const SENTINEL_THUMBNAILS = new Set(['self', 'default', 'nsfw', 'spoiler', 'image', '']);
+
 interface PostCardProps {
   post: RedditPost;
   activePostId?: string | null;
@@ -21,16 +25,15 @@ interface PostCardProps {
 
 function PostCardInner({ post, activePostId }: PostCardProps) {
   const [isMuted, setIsMuted] = useState(true);
+  const [isTextExpanded, setIsTextExpanded] = useState(false);
   const videoRef = useRef<Video>(null);
 
   // ── Media URL resolution ────────────────────────────────────────────────────
-  // Priority 1: Reddit native video (is_video posts and cross-post previews)
   const nativeVideoUrl =
     post.secure_media?.reddit_video?.fallback_url ??
     post.preview?.reddit_video_preview?.fallback_url ??
     null;
 
-  // Priority 2: GIF/GIFV link posts (.gifv → .mp4 for Imgur's container format)
   const rawUrl = post.url ?? '';
   const isGif  = !post.is_video && /\.(gif|gifv)(\?.*)?$/i.test(rawUrl);
   const gifUrl = isGif ? rawUrl.replace(/\.gifv$/i, '.mp4') : null;
@@ -38,37 +41,40 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
   const videoUrl  = nativeVideoUrl ?? gifUrl;
   const showVideo = !!videoUrl;
 
-  // Prefer a mid-res preview image; fall back down the resolution chain
-  const imageUrl =
+  // Full-size preview image (Type A)
+  const previewImageUrl =
     post.preview?.images?.[0]?.resolutions?.[2]?.url?.replace(/&amp;/g, '&') ??
     post.preview?.images?.[0]?.resolutions?.[1]?.url?.replace(/&amp;/g, '&') ??
     post.preview?.images?.[0]?.source?.url?.replace(/&amp;/g, '&') ??
     null;
 
-  const showImage =
-    !showVideo &&
-    !!imageUrl &&
-    post.thumbnail !== 'self' &&
-    post.thumbnail !== 'default' &&
-    post.thumbnail !== 'nsfw';
-
-  const showSelftext =
-    !showVideo &&
-    !showImage &&
-    !!post.selftext &&
-    post.selftext.trim().length > 0;
-
-  // Derive aspect ratio from the source image dimensions so `contain` has a
-  // real container height to work against. Falls back to 16:9 for posts that
-  // lack preview metadata (e.g. some link posts).
   const sourceImg = post.preview?.images?.[0]?.source;
   const imageAspectRatio =
     sourceImg?.width && sourceImg?.height
       ? sourceImg.width / sourceImg.height
       : 16 / 9;
 
+  // ── Post-type classification ───────────────────────────────────────────────
+  // Type A: has a full preview image or is a native/gif video
+  const isTypeA = showVideo || (!!previewImageUrl && !SENTINEL_THUMBNAILS.has(post.thumbnail));
+
+  // Type B: external link post with a valid thumbnail but no full preview
+  const hasThumbnail =
+    !!post.thumbnail &&
+    !SENTINEL_THUMBNAILS.has(post.thumbnail) &&
+    post.thumbnail.startsWith('http');
+  const isTypeB = !isTypeA && hasThumbnail;
+
+  // Type C: selftext post (pure text — only when neither A nor B)
+  const isTypeC =
+    !isTypeA &&
+    !isTypeB &&
+    post.is_self &&
+    !!post.selftext &&
+    post.selftext.trim().length > 0;
+
   // ── Navigation ──────────────────────────────────────────────────────────────
-  function handlePress() {
+  function openPostDetail() {
     router.push({
       pathname: '/post/[id]',
       params: {
@@ -83,7 +89,7 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
         permalink: post.permalink,
         selftext: post.selftext ?? '',
         created_utc: String(post.created_utc),
-        image_url: imageUrl ?? '',
+        image_url: previewImageUrl ?? '',
         flair_text: post.flair_text ?? '',
         over_18: post.over_18 ? '1' : '0',
         is_video: post.is_video ? '1' : '0',
@@ -92,52 +98,19 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
     });
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
-  return (
-    <Pressable
-      onPress={handlePress}
-      android_ripple={{ color: Colors.primaryMuted }}
-      style={styles.card}
-    >
-      {/* Title */}
-      <Text style={styles.title}>
-        {post.over_18 ? '[NSFW] ' : ''}{post.title}
-      </Text>
+  function openExternalLink() {
+    if (post.url) Linking.openURL(post.url).catch(() => {});
+  }
 
-      {/* Media — video centered in a fixed container; image uses aspect ratio */}
-      {showVideo ? (
-        <View style={styles.videoContainer}>
-          <Video
-            ref={videoRef}
-            source={{ uri: videoUrl! }}
-            style={styles.video}
-            shouldPlay={activePostId === post.id}
-            isLooping
-            isMuted={isMuted}
-            resizeMode={ResizeMode.CONTAIN}
-          />
-        </View>
-      ) : showImage ? (
-        // aspectRatio derived from the source image so `contain` renders
-        // the full image without cropping or collapsing to 0 height.
-        // maxHeight caps extreme portrait/infographic images.
-        <Image
-          source={{ uri: imageUrl! }}
-          style={[styles.image, { aspectRatio: imageAspectRatio }]}
-          resizeMode="contain"
-        />
-      ) : showSelftext ? (
-        <Text style={styles.selftext} numberOfLines={3}>
-          {post.selftext.trim()}
-        </Text>
-      ) : null}
-
-      {/* Footer: subreddit left, optional mute toggle, comment icon right */}
+  // ── Shared footer ──────────────────────────────────────────────────────────
+  function renderFooter() {
+    return (
       <View style={styles.footer}>
         <Text style={styles.subreddit} numberOfLines={1}>
           {post.subreddit_name_prefixed}
         </Text>
 
+        {/* Mute toggle — video posts only */}
         {showVideo && (
           <Pressable
             onPress={() => setIsMuted((prev) => !prev)}
@@ -154,8 +127,25 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
           </Pressable>
         )}
 
+        {/* Expand/collapse chevron — text posts only */}
+        {isTypeC && (
+          <Pressable
+            onPress={() => setIsTextExpanded((prev) => !prev)}
+            hitSlop={10}
+            style={styles.footerBtn}
+            accessibilityLabel={isTextExpanded ? 'Collapse text' : 'Expand text'}
+            accessibilityRole="button"
+          >
+            <MaterialIcons
+              name={isTextExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+              size={20}
+              color={BRAND}
+            />
+          </Pressable>
+        )}
+
         <Pressable
-          onPress={handlePress}
+          onPress={openPostDetail}
           hitSlop={10}
           style={styles.footerBtn}
           accessibilityLabel={`Open comments (${post.num_comments})`}
@@ -164,6 +154,113 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
           <MaterialIcons name="chat-bubble-outline" size={20} color={BRAND} />
         </Pressable>
       </View>
+    );
+  }
+
+  // ── Type A: standard media card ────────────────────────────────────────────
+  if (isTypeA) {
+    return (
+      <Pressable
+        onPress={openPostDetail}
+        android_ripple={{ color: Colors.primaryMuted }}
+        style={styles.card}
+      >
+        <Text style={styles.title}>
+          {post.over_18 ? '[NSFW] ' : ''}{post.title}
+        </Text>
+
+        {showVideo ? (
+          <View style={styles.videoContainer}>
+            <Video
+              ref={videoRef}
+              source={{ uri: videoUrl! }}
+              style={styles.video}
+              shouldPlay={activePostId === post.id}
+              isLooping
+              isMuted={isMuted}
+              resizeMode={ResizeMode.CONTAIN}
+            />
+          </View>
+        ) : (
+          <Image
+            source={{ uri: previewImageUrl! }}
+            style={[styles.image, { aspectRatio: imageAspectRatio }]}
+            resizeMode="contain"
+          />
+        )}
+
+        {renderFooter()}
+      </Pressable>
+    );
+  }
+
+  // ── Type B: external link with thumbnail ───────────────────────────────────
+  if (isTypeB) {
+    return (
+      <Pressable
+        onPress={openPostDetail}
+        android_ripple={{ color: Colors.primaryMuted }}
+        style={styles.card}
+      >
+        <View style={styles.linkRow}>
+          {/* Left: title + external link tap target */}
+          <Pressable style={styles.linkTextArea} onPress={openExternalLink}>
+            <Text style={styles.title} numberOfLines={4}>
+              {post.over_18 ? '[NSFW] ' : ''}{post.title}
+            </Text>
+            <Text style={styles.linkDomain} numberOfLines={1}>
+              {(() => { try { return new URL(post.url).hostname.replace(/^www\./, ''); } catch { return post.url; } })()}
+            </Text>
+          </Pressable>
+
+          {/* Right: small thumbnail */}
+          <Image
+            source={{ uri: post.thumbnail }}
+            style={styles.thumbnail}
+            resizeMode="cover"
+          />
+        </View>
+
+        {renderFooter()}
+      </Pressable>
+    );
+  }
+
+  // ── Type C: expandable selftext ────────────────────────────────────────────
+  if (isTypeC) {
+    return (
+      <Pressable
+        onPress={openPostDetail}
+        android_ripple={{ color: Colors.primaryMuted }}
+        style={styles.card}
+      >
+        <Text style={styles.title}>
+          {post.over_18 ? '[NSFW] ' : ''}{post.title}
+        </Text>
+
+        <Text
+          style={styles.selftext}
+          numberOfLines={isTextExpanded ? undefined : 3}
+        >
+          {post.selftext.trim()}
+        </Text>
+
+        {renderFooter()}
+      </Pressable>
+    );
+  }
+
+  // ── Fallback: title-only card ──────────────────────────────────────────────
+  return (
+    <Pressable
+      onPress={openPostDetail}
+      android_ripple={{ color: Colors.primaryMuted }}
+      style={styles.card}
+    >
+      <Text style={styles.title}>
+        {post.over_18 ? '[NSFW] ' : ''}{post.title}
+      </Text>
+      {renderFooter()}
     </Pressable>
   );
 }
@@ -185,7 +282,8 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: Spacing.sm,
   },
-  // Centered container for the fixed-height video
+
+  // ── Type A ────────────────────────────────────────────────────────────────
   videoContainer: {
     width: '100%',
     height: 220,
@@ -200,8 +298,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  // Image: no fixed height — aspectRatio applied inline; maxHeight caps
-  // portrait images so an infographic never takes over the whole screen.
   image: {
     width: '100%',
     maxHeight: 400,
@@ -209,12 +305,40 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     backgroundColor: Colors.border,
   },
+
+  // ── Type B ────────────────────────────────────────────────────────────────
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.xs,
+    gap: Spacing.sm,
+  },
+  linkTextArea: {
+    flex: 1,
+  },
+  linkDomain: {
+    color: Colors.textMuted,
+    fontSize: Typography.xs,
+    marginTop: 2,
+    marginBottom: Spacing.xs,
+  },
+  thumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: Colors.border,
+    flexShrink: 0,
+  },
+
+  // ── Type C ────────────────────────────────────────────────────────────────
   selftext: {
     color: Colors.textMuted,
     fontSize: Typography.sm,
     lineHeight: 19,
     marginBottom: Spacing.sm,
   },
+
+  // ── Footer ────────────────────────────────────────────────────────────────
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
