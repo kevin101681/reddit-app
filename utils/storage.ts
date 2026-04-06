@@ -54,13 +54,18 @@ export async function removeFavorite(subreddit: string): Promise<void> {
 
 const VALID_SORTS = ['hot', 'new', 'top', 'controversial'];
 
+function sortKey(subreddit: string): string {
+  const normalized = subreddit.toLowerCase().trim().replace(/^r\//i, '') || 'all';
+  return `@personal_reddit:sort:${normalized}`;
+}
+
 /**
- * Return the persisted sort preference.
+ * Return the persisted sort preference for a specific subreddit.
  * Defaults to "hot" if nothing is stored or the stored value is invalid.
  */
-export async function getSortPreference(): Promise<string> {
+export async function getSortPreference(subreddit = 'all'): Promise<string> {
   try {
-    const raw = await AsyncStorage.getItem(KEY_SORT);
+    const raw = await AsyncStorage.getItem(sortKey(subreddit));
     if (raw && VALID_SORTS.includes(raw)) return raw;
     return 'hot';
   } catch {
@@ -69,11 +74,11 @@ export async function getSortPreference(): Promise<string> {
 }
 
 /**
- * Persist the active sort preference.
+ * Persist the sort preference for a specific subreddit.
  */
-export async function setSortPreference(sort: string): Promise<void> {
+export async function setSortPreference(sort: string, subreddit = 'all'): Promise<void> {
   try {
-    await AsyncStorage.setItem(KEY_SORT, sort);
+    await AsyncStorage.setItem(sortKey(subreddit), sort);
   } catch {
     // Storage errors are non-fatal; silently ignore
   }

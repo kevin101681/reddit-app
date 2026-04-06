@@ -48,14 +48,14 @@ export default function FeedScreen() {
 
   useEffect(() => {
     let active = true;
-    getSortPreference().then((s) => { if (active) setSort(s); });
+    getSortPreference(sub).then((s) => { if (active) setSort(s); });
     return () => { active = false; };
-  }, []);
+  }, [sub]);
 
   const handleSortSelect = useCallback(async (newSort: string) => {
-    setSortPreference(newSort);
+    setSortPreference(newSort, sub);
     setSort(newSort);
-  }, []);
+  }, [sub]);
 
   function openSortPicker() {
     const labels  = SORT_OPTIONS.map((o) => o.label);

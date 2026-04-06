@@ -102,12 +102,12 @@ export default function FrontpageScreen() {
   // ── Sort ──────────────────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
-    getSortPreference().then((s) => { if (active) setSort(s); });
+    getSortPreference(SUBREDDIT).then((s) => { if (active) setSort(s); });
     return () => { active = false; };
   }, []);
 
   const handleSortSelect = useCallback(async (newSort: string) => {
-    setSortPreference(newSort);
+    setSortPreference(newSort, SUBREDDIT);
     setSort(newSort);
     setIsSortOpen(false);
   }, []);

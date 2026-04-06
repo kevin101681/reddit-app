@@ -1,4 +1,4 @@
-﻿import React, { memo } from 'react';
+﻿import React, { memo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,9 @@ interface PostCardProps {
 }
 
 function PostCardInner({ post, activePostId }: PostCardProps) {
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef<Video>(null);
+
   // ── Media URL resolution ────────────────────────────────────────────────────
   // Priority 1: Reddit native video (is_video posts and cross-post previews)
   const nativeVideoUrl =
@@ -101,16 +104,19 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
         {post.over_18 ? '[NSFW] ' : ''}{post.title}
       </Text>
 
-      {/* Main content: native video > GIF video > image > selftext */}
+      {/* Media — video centered in a fixed container; image uses aspect ratio */}
       {showVideo ? (
-        <Video
-          source={{ uri: videoUrl! }}
-          style={styles.video}
-          shouldPlay={activePostId === post.id}
-          isLooping
-          isMuted
-          resizeMode={ResizeMode.CONTAIN}
-        />
+        <View style={styles.videoContainer}>
+          <Video
+            ref={videoRef}
+            source={{ uri: videoUrl! }}
+            style={styles.video}
+            shouldPlay={activePostId === post.id}
+            isLooping
+            isMuted={isMuted}
+            resizeMode={ResizeMode.CONTAIN}
+          />
+        </View>
       ) : showImage ? (
         // aspectRatio derived from the source image so `contain` renders
         // the full image without cropping or collapsing to 0 height.
@@ -126,15 +132,32 @@ function PostCardInner({ post, activePostId }: PostCardProps) {
         </Text>
       ) : null}
 
-      {/* Footer: subreddit left, comment icon right */}
+      {/* Footer: subreddit left, optional mute toggle, comment icon right */}
       <View style={styles.footer}>
         <Text style={styles.subreddit} numberOfLines={1}>
           {post.subreddit_name_prefixed}
         </Text>
+
+        {showVideo && (
+          <Pressable
+            onPress={() => setIsMuted((prev) => !prev)}
+            hitSlop={10}
+            style={styles.footerBtn}
+            accessibilityLabel={isMuted ? 'Unmute video' : 'Mute video'}
+            accessibilityRole="button"
+          >
+            <MaterialIcons
+              name={isMuted ? 'volume-off' : 'volume-up'}
+              size={20}
+              color={BRAND}
+            />
+          </Pressable>
+        )}
+
         <Pressable
           onPress={handlePress}
           hitSlop={10}
-          style={styles.commentBtn}
+          style={styles.footerBtn}
           accessibilityLabel={`Open comments (${post.num_comments})`}
           accessibilityRole="button"
         >
@@ -162,13 +185,20 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: Spacing.sm,
   },
-  // Fixed-height video container — video content fills it via CONTAIN
-  video: {
+  // Centered container for the fixed-height video
+  videoContainer: {
     width: '100%',
     height: 220,
     borderRadius: Radius.md,
     marginBottom: Spacing.sm,
     backgroundColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
   },
   // Image: no fixed height — aspectRatio applied inline; maxHeight caps
   // portrait images so an infographic never takes over the whole screen.
@@ -196,8 +226,9 @@ const styles = StyleSheet.create({
     fontSize: Typography.xs,
     fontWeight: '700',
   },
-  commentBtn: {
+  footerBtn: {
     padding: Spacing.xs,
     borderRadius: Radius.sm,
+    marginLeft: Spacing.xs,
   },
 });
