@@ -101,8 +101,7 @@ function normalizeComment(child: any, depth = 0): RedditComment | null {
  * Fetch a page of posts.
  *
  * Native (iOS/Android): hits reddit.com directly.
- * Web: routes through the integrated Netlify function at
- *      /.netlify/functions/proxy which adds the required CORS headers.
+ * Web: routes through allorigins.win/raw to bypass CORS and datacenter IP blocks.
  */
 export async function getPosts(
   subreddit: string,
@@ -116,9 +115,9 @@ export async function getPosts(
   // 1. Always build the canonical Reddit URL first
   let endpoint = REDDIT_BASE + "/r/" + encodeURIComponent(subreddit) + "/" + encodeURIComponent(sort) + ".json?" + params.toString();
 
-  // 2. On web only: route through the integrated Netlify function
+  // 2. On web only: route through allorigins.win to bypass CORS and datacenter IP blocks
   if (Platform.OS === "web") {
-    endpoint = "/.netlify/functions/proxy?url=" + encodeURIComponent(endpoint);
+    endpoint = "https://api.allorigins.win/raw?url=" + encodeURIComponent(endpoint);
   }
 
   const raw = await redditFetch<any>(endpoint, signal);
@@ -135,7 +134,7 @@ export async function getPosts(
  * Fetch the comment tree for a post.
  *
  * Native (iOS/Android): hits reddit.com directly.
- * Web: routes through the integrated Netlify function.
+ * Web: routes through allorigins.win/raw to bypass CORS and datacenter IP blocks.
  *
  * Reddit returns a two-element array: [postListing, commentsListing].
  */
@@ -150,9 +149,9 @@ export async function getComments(
     ? REDDIT_BASE + "/r/" + encodeURIComponent(subreddit) + "/comments/" + encodeURIComponent(postId) + ".json?raw_json=1&limit=200"
     : REDDIT_BASE + "/comments/" + encodeURIComponent(postId) + ".json?raw_json=1&limit=200";
 
-  // 2. On web only: route through the integrated Netlify function
+  // 2. On web only: route through allorigins.win to bypass CORS and datacenter IP blocks
   if (Platform.OS === "web") {
-    endpoint = "/.netlify/functions/proxy?url=" + encodeURIComponent(endpoint);
+    endpoint = "https://api.allorigins.win/raw?url=" + encodeURIComponent(endpoint);
   }
 
   const raw = await redditFetch<any[]>(endpoint, signal);
