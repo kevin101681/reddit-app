@@ -101,8 +101,8 @@ function normalizeComment(child: any, depth = 0): RedditComment | null {
  * Fetch a page of posts.
  *
  * Native (iOS/Android): hits reddit.com directly.
- * Web: wraps the identical Reddit URL in corsproxy.io to satisfy the
- *      browser's same-origin policy — no custom backend required.
+ * Web: routes through the integrated Netlify function at
+ *      /.netlify/functions/proxy which adds the required CORS headers.
  */
 export async function getPosts(
   subreddit: string,
@@ -116,9 +116,9 @@ export async function getPosts(
   // 1. Always build the canonical Reddit URL first
   let endpoint = REDDIT_BASE + "/r/" + encodeURIComponent(subreddit) + "/" + encodeURIComponent(sort) + ".json?" + params.toString();
 
-  // 2. On web only: wrap the Reddit URL in corsproxy.io
+  // 2. On web only: route through the integrated Netlify function
   if (Platform.OS === "web") {
-    endpoint = "https://corsproxy.io/?" + encodeURIComponent(endpoint);
+    endpoint = "/.netlify/functions/proxy?url=" + encodeURIComponent(endpoint);
   }
 
   const raw = await redditFetch<any>(endpoint, signal);
@@ -135,7 +135,7 @@ export async function getPosts(
  * Fetch the comment tree for a post.
  *
  * Native (iOS/Android): hits reddit.com directly.
- * Web: wraps the identical Reddit URL in corsproxy.io.
+ * Web: routes through the integrated Netlify function.
  *
  * Reddit returns a two-element array: [postListing, commentsListing].
  */
@@ -150,9 +150,9 @@ export async function getComments(
     ? REDDIT_BASE + "/r/" + encodeURIComponent(subreddit) + "/comments/" + encodeURIComponent(postId) + ".json?raw_json=1&limit=200"
     : REDDIT_BASE + "/comments/" + encodeURIComponent(postId) + ".json?raw_json=1&limit=200";
 
-  // 2. On web only: wrap the Reddit URL in corsproxy.io
+  // 2. On web only: route through the integrated Netlify function
   if (Platform.OS === "web") {
-    endpoint = "https://corsproxy.io/?" + encodeURIComponent(endpoint);
+    endpoint = "/.netlify/functions/proxy?url=" + encodeURIComponent(endpoint);
   }
 
   const raw = await redditFetch<any[]>(endpoint, signal);
