@@ -213,16 +213,16 @@ export default function FrontpageScreen() {
           headerTintColor: theme.text,
           headerTitleStyle: { fontWeight: "700", color: theme.text },
           headerShown: true,
-          headerRight: () => (
+          headerRight: isDesktop ? () => (
             <Pressable
               onPress={() => setIsMenuOpen(true)}
-              style={{ marginRight: 8, padding: 8 }}
+              style={{ marginRight: 16, padding: 8 }}
               accessibilityLabel="Open menu"
               accessibilityRole="button"
             >
-              <MaterialIcons name="menu" size={26} color={theme.text} />
+              <MaterialIcons name="menu" size={28} color={theme.text} />
             </Pressable>
-          ),
+          ) : undefined,
         }}
       />
 
@@ -258,6 +258,17 @@ export default function FrontpageScreen() {
           </View>
         )}
       </View>
+
+      {!isDesktop && (
+        <Pressable
+          onPress={() => setIsMenuOpen(true)}
+          style={{ position: "absolute", bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: "#333", justifyContent: "center", alignItems: "center", elevation: 4 }}
+          accessibilityLabel="Open menu"
+          accessibilityRole="button"
+        >
+          <MaterialIcons name="menu" size={24} color="#fff" />
+        </Pressable>
+      )}
 
       <NavigationSheet
         sort={sort}

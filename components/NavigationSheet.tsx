@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Keyboard,
@@ -12,7 +12,7 @@ import {
   View,
   Alert,
 } from "react-native";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, usePathname } from "expo-router";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getFavorites, removeFavorite } from "../utils/storage";
@@ -33,7 +33,7 @@ interface NavigationSheetProps {
   onSortSelect?: (sort: string) => void;
   viewMode?: "standard" | "compact";
   onViewModeToggle?: () => void;
-  /** Controlled open state — when provided the parent drives open/close */
+  /** Controlled open state � when provided the parent drives open/close */
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
@@ -50,6 +50,7 @@ export function NavigationSheet({
   const { width } = useWindowDimensions();
   const isDesktop = width >= 850;
   const { theme, themeName, toggleTheme } = useTheme();
+  const pathname = usePathname();
 
   const [internalOpen, setInternalOpen] = useState(false);
   // Controlled when isOpen prop is provided; otherwise self-managed
@@ -62,7 +63,7 @@ export function NavigationSheet({
   const [favorites,      setFavorites]      = useState<string[]>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-  // ── Manual keyboard height tracking ────────────────────────────────────────
+  // -- Manual keyboard height tracking ----------------------------------------
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
@@ -103,7 +104,8 @@ export function NavigationSheet({
     if (!sub) return;
     setIsMenuOpen(false);
     setMenuInput("");
-    setTimeout(() => router.push({ pathname: "/feed", params: { subreddit: sub } }), 50);
+    const navigate = pathname === "/" ? router.push : router.replace;
+    setTimeout(() => navigate({ pathname: "/feed", params: { subreddit: sub } }), 50);
   }
 
   function handleSortChip(value: string) {
@@ -113,7 +115,7 @@ export function NavigationSheet({
 
   const showSort  = !!sort && !!onSortSelect;
 
-  // ── Dynamic panel style — bottom sheet on mobile, side drawer on desktop ──
+  // -- Dynamic panel style � bottom sheet on mobile, side drawer on desktop --
   const panelStyle = isDesktop
     ? {
         position:        "absolute" as const,
@@ -139,7 +141,7 @@ export function NavigationSheet({
         backgroundColor:       theme.surface,
       };
 
-  // ── Menu inner content (shared between mobile sheet and desktop drawer) ────
+  // -- Menu inner content (shared between mobile sheet and desktop drawer) ----
   function renderMenuContent() {
     return (
       <ScrollView
@@ -151,7 +153,7 @@ export function NavigationSheet({
           paddingTop: isDesktop ? 16 : 0,
         }}
       >
-        {/* ── Theme & View Mode toggles ─────────────────────────────────── */}
+        {/* -- Theme & View Mode toggles ----------------------------------- */}
         <View style={styles.controlRow}>
           <Pressable
             style={[styles.controlBtn, { borderColor: theme.border, backgroundColor: theme.background }]}
@@ -183,7 +185,7 @@ export function NavigationSheet({
           )}
         </View>
 
-        {/* ── Sort chips ────────────────────────────────────────────────── */}
+        {/* -- Sort chips -------------------------------------------------- */}
         {showSort && (
           <View style={styles.sortChips}>
             {SORT_OPTIONS.map((option) => (
@@ -210,7 +212,7 @@ export function NavigationSheet({
           </View>
         )}
 
-        {/* ── Subreddit search ──────────────────────────────────────────── */}
+        {/* -- Subreddit search -------------------------------------------- */}
         <View style={styles.searchRow}>
           <TextInput
             style={[styles.searchInput, {
@@ -234,13 +236,13 @@ export function NavigationSheet({
           </Pressable>
         </View>
 
-        {/* ── Favourites ────────────────────────────────────────────────── */}
+        {/* -- Favourites -------------------------------------------------- */}
         {favorites.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={[styles.emptyStar, { color: theme.textMuted }]}>{"☆"}</Text>
+            <Text style={[styles.emptyStar, { color: theme.textMuted }]}>{"?"}</Text>
             <Text style={[styles.emptyTitle, { color: theme.text }]}>No saved subreddits</Text>
             <Text style={[styles.emptyHint, { color: theme.textMuted }]}>
-              Browse any subreddit and tap the {"★"} star in the header to save it here.
+              Browse any subreddit and tap the {"?"} star in the header to save it here.
             </Text>
           </View>
         ) : (
@@ -253,7 +255,6 @@ export function NavigationSheet({
                     onPress={() => navigateToSubreddit(fav)}
                   >
                     <Text style={[styles.favName, { color: theme.text }]}>{"r/" + fav}</Text>
-                    <Text style={[styles.favChevron, { color: theme.textMuted }]}>{">"}</Text>
                   </Pressable>
                   <Pressable
                     style={({ pressed }) => [styles.favDelete, pressed && styles.favDeletePressed]}
@@ -280,19 +281,19 @@ export function NavigationSheet({
     <>
       {isMenuOpen && (
         <>
-          {/* Scrim — closes menu; transparent on desktop so content stays interactive */}
+          {/* Scrim � closes menu; transparent on desktop so content stays interactive */}
           <Pressable
             style={[styles.menuScrim, isDesktop && { backgroundColor: "transparent" }]}
             onPress={() => setIsMenuOpen(false)}
           />
 
           <Animated.View style={panelStyle}>
-            {/* Drag handle — mobile only */}
+            {/* Drag handle � mobile only */}
             {!isDesktop && (
               <View style={[styles.menuHandle, { backgroundColor: theme.border }]} />
             )}
 
-            {/* Header row — close button */}
+            {/* Header row � close button */}
             <View style={[styles.menuHeader, isDesktop && styles.menuHeaderDesktop]}>
               {isDesktop && (
                 <Text style={[styles.desktopTitle, { color: theme.text }]}>Menu</Text>
@@ -308,7 +309,7 @@ export function NavigationSheet({
                 accessibilityLabel="Close menu"
                 accessibilityRole="button"
               >
-                <Text style={[styles.menuCloseText, { color: theme.textMuted }]}>{"✕"}</Text>
+                <Text style={[styles.menuCloseText, { color: theme.textMuted }]}>{"?"}</Text>
               </Pressable>
             </View>
 
@@ -384,7 +385,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md,
   },
   favName:    { flex: 1, fontSize: Typography.md, fontWeight: "600" },
-  favChevron: { fontSize: Typography.xl, fontWeight: "300", marginRight: Spacing.sm },
   favDelete:  { paddingHorizontal: Spacing.md, paddingVertical: Spacing.md },
   favDeletePressed: { opacity: 0.4 },
   favSeparator: { height: StyleSheet.hairlineWidth, marginLeft: Spacing.lg },

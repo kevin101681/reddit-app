@@ -243,14 +243,16 @@ export default function FeedScreen() {
                   {isFavorited ? "\u2605" : "\u2606"}
                 </Text>
               </Pressable>
-              <Pressable
-                onPress={() => setIsMenuOpen(true)}
-                style={{ marginRight: 8, padding: 8 }}
-                accessibilityLabel="Open menu"
-                accessibilityRole="button"
-              >
-                <MaterialIcons name="menu" size={26} color={theme.text} />
-              </Pressable>
+              {isDesktop && (
+                <Pressable
+                  onPress={() => setIsMenuOpen(true)}
+                  style={{ marginRight: 16, padding: 8 }}
+                  accessibilityLabel="Open menu"
+                  accessibilityRole="button"
+                >
+                  <MaterialIcons name="menu" size={28} color={theme.text} />
+                </Pressable>
+              )}
             </View>
           ),
         }}
@@ -288,6 +290,17 @@ export default function FeedScreen() {
           </View>
         )}
       </View>
+
+      {!isDesktop && (
+        <Pressable
+          onPress={() => setIsMenuOpen(true)}
+          style={{ position: "absolute", bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: "#333", justifyContent: "center", alignItems: "center", elevation: 4 }}
+          accessibilityLabel="Open menu"
+          accessibilityRole="button"
+        >
+          <MaterialIcons name="menu" size={24} color="#fff" />
+        </Pressable>
+      )}
 
       <NavigationSheet
         sort={sort}
