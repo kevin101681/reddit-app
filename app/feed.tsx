@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { getPosts } from "../utils/api";
 import { RedditPost } from "../utils/types";
 import { PostCard } from "../components/PostCard";
@@ -30,7 +31,6 @@ import { useTheme } from "../utils/ThemeContext";
 import { NavigationSheet } from "../components/NavigationSheet";
 
 const BRAND    = "#7ba0b3";
-const FAB_SIZE = 56;
 
 export default function FeedScreen() {
   const { subreddit } = useLocalSearchParams<{ subreddit: string }>();
@@ -88,6 +88,7 @@ export default function FeedScreen() {
 
   // ── Favourite state ─────────────────────────────────────────────────────────
   const [isFavorited, setIsFavorited] = useState(false);
+  const [isMenuOpen, setIsMenuOpen]   = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -187,7 +188,7 @@ export default function FeedScreen() {
         style={[styles.fillContainer, { backgroundColor: theme.background }]}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: isDesktop ? Spacing.xl : FAB_SIZE + 80 + Spacing.xl },
+          { paddingBottom: Spacing.xl * 3 },
         ]}
         refreshControl={
           <RefreshControl
@@ -230,17 +231,27 @@ export default function FeedScreen() {
           headerTintColor: theme.text,
           headerTitleStyle: { fontWeight: "700", color: theme.text },
           headerRight: () => (
-            <Pressable
-              onPress={toggleFavorite}
-              style={({ pressed }) => [styles.starBtn, pressed && styles.starBtnPressed]}
-              hitSlop={8}
-              accessibilityLabel={isFavorited ? "Remove from favourites" : "Add to favourites"}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.starIcon, isFavorited && styles.starIconFilled]}>
-                {isFavorited ? "\u2605" : "\u2606"}
-              </Text>
-            </Pressable>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Pressable
+                onPress={toggleFavorite}
+                style={({ pressed }) => [styles.starBtn, pressed && styles.starBtnPressed]}
+                hitSlop={8}
+                accessibilityLabel={isFavorited ? "Remove from favourites" : "Add to favourites"}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.starIcon, isFavorited && styles.starIconFilled]}>
+                  {isFavorited ? "\u2605" : "\u2606"}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setIsMenuOpen(true)}
+                style={{ marginRight: 8, padding: 8 }}
+                accessibilityLabel="Open menu"
+                accessibilityRole="button"
+              >
+                <MaterialIcons name="menu" size={26} color={theme.text} />
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -251,7 +262,7 @@ export default function FeedScreen() {
         {/* Left: feed column */}
         <View style={[
           styles.fillContainer,
-          isDesktop && { maxWidth: 450, borderRightWidth: 1, borderColor: theme.border },
+          isDesktop && { maxWidth: 450 },
         ]}>
           {renderFeed()}
         </View>
@@ -283,6 +294,8 @@ export default function FeedScreen() {
         onSortSelect={handleSortSelect}
         viewMode={viewMode}
         onViewModeToggle={handleViewModeToggle}
+        isOpen={isMenuOpen}
+        onOpenChange={setIsMenuOpen}
       />
     </View>
   );

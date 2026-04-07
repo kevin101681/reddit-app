@@ -20,6 +20,7 @@ function RootStack() {
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: theme.surface },
+          headerShadowVisible: false,
           headerTintColor: theme.text,
           headerTitleStyle: { fontWeight: '700', color: theme.text },
           contentStyle: { backgroundColor: theme.background },

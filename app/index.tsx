@@ -1,6 +1,7 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -10,6 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Stack } from "expo-router";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getPosts } from "../utils/api";
 import { RedditPost } from "../utils/types";
@@ -28,7 +30,6 @@ import { NavigationSheet } from "../components/NavigationSheet";
 
 const SUBREDDIT = "all";
 const BRAND     = "#7ba0b3";
-const FAB_SIZE  = 56;
 
 export default function FrontpageScreen() {
   const insets  = useSafeAreaInsets();
@@ -47,6 +48,7 @@ export default function FrontpageScreen() {
   const [error, setError]       = useState<string | null>(null);
   const [activePostId, setActivePostId]   = useState<string | null>(null);
   const [selectedPost, setSelectedPost]   = useState<RedditPost | null>(null);
+  const [isMenuOpen, setIsMenuOpen]       = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   // ── Viewability ─────────────────────────────────────────────────────────────
@@ -167,7 +169,7 @@ export default function FrontpageScreen() {
         style={[styles.fillContainer, { backgroundColor: theme.background }]}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: isDesktop ? Spacing.xl : FAB_SIZE + 80 + Spacing.xl },
+          { paddingBottom: Spacing.xl * 3 },
         ]}
         refreshControl={
           <RefreshControl
@@ -211,6 +213,16 @@ export default function FrontpageScreen() {
           headerTintColor: theme.text,
           headerTitleStyle: { fontWeight: "700", color: theme.text },
           headerShown: true,
+          headerRight: () => (
+            <Pressable
+              onPress={() => setIsMenuOpen(true)}
+              style={{ marginRight: 8, padding: 8 }}
+              accessibilityLabel="Open menu"
+              accessibilityRole="button"
+            >
+              <MaterialIcons name="menu" size={26} color={theme.text} />
+            </Pressable>
+          ),
         }}
       />
 
@@ -220,7 +232,7 @@ export default function FrontpageScreen() {
         {/* Left: feed column — capped at 450 px on desktop */}
         <View style={[
           styles.fillContainer,
-          isDesktop && { maxWidth: 450, borderRightWidth: 1, borderColor: theme.border },
+          isDesktop && { maxWidth: 450 },
         ]}>
           {renderFeed()}
         </View>
@@ -252,6 +264,8 @@ export default function FrontpageScreen() {
         onSortSelect={handleSortSelect}
         viewMode={viewMode}
         onViewModeToggle={handleViewModeToggle}
+        isOpen={isMenuOpen}
+        onOpenChange={setIsMenuOpen}
       />
     </View>
   );

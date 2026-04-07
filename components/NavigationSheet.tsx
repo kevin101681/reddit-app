@@ -20,7 +20,6 @@ import { Spacing, Typography, Radius } from "../constants/theme";
 import { useTheme } from "../utils/ThemeContext";
 
 const BRAND    = "#7ba0b3";
-const FAB_SIZE = 56;
 
 const SORT_OPTIONS = [
   { label: "Hot",           value: "hot" },
@@ -34,6 +33,9 @@ interface NavigationSheetProps {
   onSortSelect?: (sort: string) => void;
   viewMode?: "standard" | "compact";
   onViewModeToggle?: () => void;
+  /** Controlled open state — when provided the parent drives open/close */
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function NavigationSheet({
@@ -41,18 +43,24 @@ export function NavigationSheet({
   onSortSelect,
   viewMode,
   onViewModeToggle,
+  isOpen,
+  onOpenChange,
 }: NavigationSheetProps) {
   const insets  = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 850;
   const { theme, themeName, toggleTheme } = useTheme();
 
-  const [isMenuOpen,     setIsMenuOpen]     = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  // Controlled when isOpen prop is provided; otherwise self-managed
+  const isMenuOpen = isOpen !== undefined ? isOpen : internalOpen;
+  function setIsMenuOpen(val: boolean) {
+    setInternalOpen(val);
+    onOpenChange?.(val);
+  }
   const [menuInput,      setMenuInput]      = useState("");
   const [favorites,      setFavorites]      = useState<string[]>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-  const fabTranslateY = useRef(new Animated.Value(0)).current;
 
   // ── Manual keyboard height tracking ────────────────────────────────────────
   useEffect(() => {
@@ -103,7 +111,6 @@ export function NavigationSheet({
     setIsMenuOpen(false);
   }
 
-  const fabBottom = Math.max(insets.bottom, Spacing.lg) + Spacing.lg;
   const showSort  = !!sort && !!onSortSelect;
 
   // ── Dynamic panel style — bottom sheet on mobile, side drawer on desktop ──
@@ -271,35 +278,6 @@ export function NavigationSheet({
 
   return (
     <>
-      {/* FAB — hidden on desktop (drawer toggle is the close button) */}
-      {!isDesktop && (
-        <Animated.View
-          style={[styles.fab, { bottom: fabBottom, transform: [{ translateY: fabTranslateY }] }]}
-          pointerEvents="box-none"
-        >
-          <Pressable
-            onPress={() => setIsMenuOpen(true)}
-            style={({ pressed }) => [styles.fabBtn, pressed && styles.fabBtnPressed]}
-            accessibilityLabel="Open subreddit menu"
-            accessibilityRole="button"
-          >
-            <MaterialIcons name="menu" size={26} color="#fff" />
-          </Pressable>
-        </Animated.View>
-      )}
-
-      {/* Desktop: always-accessible drawer toggle button in top-right */}
-      {isDesktop && (
-        <Pressable
-          onPress={() => setIsMenuOpen((v) => !v)}
-          style={[styles.desktopToggle, { backgroundColor: theme.surface, borderColor: theme.border }]}
-          accessibilityLabel="Toggle menu"
-          accessibilityRole="button"
-        >
-          <MaterialIcons name="menu" size={22} color={BRAND} />
-        </Pressable>
-      )}
-
       {isMenuOpen && (
         <>
           {/* Scrim — closes menu; transparent on desktop so content stays interactive */}
@@ -343,22 +321,6 @@ export function NavigationSheet({
 }
 
 const styles = StyleSheet.create({
-  fab: { position: "absolute", right: Spacing.lg, zIndex: 50 },
-  fabBtn: {
-    width: FAB_SIZE, height: FAB_SIZE, borderRadius: FAB_SIZE / 2,
-    backgroundColor: BRAND, alignItems: "center", justifyContent: "center",
-    elevation: 6, shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.28, shadowRadius: 5,
-  },
-  fabBtnPressed: { opacity: 0.85 },
-
-  desktopToggle: {
-    position: "absolute", top: 12, right: 12, zIndex: 50,
-    width: 40, height: 40, borderRadius: 8,
-    alignItems: "center", justifyContent: "center",
-    borderWidth: 1,
-  },
-
   menuScrim: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.5)",
