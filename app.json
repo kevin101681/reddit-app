@@ -28,11 +28,14 @@
     },
     "web": {
       "bundler": "metro",
-      "favicon": "./assets/favicon.png",
+      "favicon": "./public/icon.png",
       "shortName": "Reddit App",
       "name": "Personal Reddit Client",
       "themeColor": "#7ba0b3",
-      "display": "standalone"
+      "display": "standalone",
+      "icons": [
+        { "src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+      ]
     },
     "plugins": [
       "expo-router",
