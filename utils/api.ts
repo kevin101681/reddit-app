@@ -14,12 +14,17 @@ async function redditFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
 
   // Browsers silently drop (or hard-block) a spoofed User-Agent, so we omit it
   // on web and only attach it for native builds where it reduces rate-limiting.
-  const headers: Record<string, string> = { "Accept": "application/json" };
+  const headers: Record<string, string> = {
+    "Accept":          "application/json",
+    "Cache-Control":   "no-cache, no-store, must-revalidate",
+    "Pragma":          "no-cache",
+    "Expires":         "0",
+  };
   if (Platform.OS !== "web") {
     headers["User-Agent"] = USER_AGENT;
   }
 
-  const response = await fetch(url, { headers, signal });
+  const response = await fetch(url, { cache: "no-store", headers, signal });
 
   if (!response.ok) {
     console.error("[API ERROR] " + response.status + " on " + Platform.OS + ":", url);
