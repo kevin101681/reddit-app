@@ -26,8 +26,7 @@ async function redditFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
     throw new Error("API Error: " + response.status);
   }
 
-  // Guard against proxy or Reddit returning an HTML error page with HTTP 200.
-  // Peeking at Content-Type is fast and prevents the cryptic JSON parse crash.
+  // Guard against Reddit returning an HTML error page (e.g. rate-limit) instead of JSON.
   const ct = response.headers.get("content-type") ?? "";
   if (!ct.includes("application/json") && !ct.includes("text/json")) {
     const preview = await response.clone().text().then((t) => t.slice(0, 120));
@@ -110,7 +109,7 @@ function normalizeComment(child: any, depth = 0): RedditComment | null {
  * Fetch a page of posts.
  *
  * Native (iOS/Android): hits reddit.com directly.
- * Web: routes through the Cloudflare Edge Worker to bypass CORS.
+ * Fetches directly from reddit.com on all platforms.
  */
 export async function getPosts(
   subreddit: string,
@@ -121,13 +120,7 @@ export async function getPosts(
   const params = new URLSearchParams({ limit: "25", raw_json: "1" });
   if (after) params.set("after", after);
 
-  // 1. Always build the canonical Reddit URL first
-  let endpoint = REDDIT_BASE + "/r/" + encodeURIComponent(subreddit) + "/" + encodeURIComponent(sort) + ".json?" + params.toString();
-
-  // 2. On web: route through the Cloudflare Edge Worker (bypasses Reddit's datacenter IP blocks).
-  if (Platform.OS === "web") {
-    endpoint = "https://reddit-pwa-proxy.kfp1016.workers.dev/?url=" + encodeURIComponent(endpoint);
-  }
+  const endpoint = REDDIT_BASE + "/r/" + encodeURIComponent(subreddit) + "/" + encodeURIComponent(sort) + ".json?" + params.toString();
 
   const raw = await redditFetch<any>(endpoint, signal);
 
@@ -143,7 +136,7 @@ export async function getPosts(
  * Fetch the comment tree for a post.
  *
  * Native (iOS/Android): hits reddit.com directly.
- * Web: routes through the Cloudflare Edge Worker to bypass CORS.
+ * Fetches directly from reddit.com on all platforms.
  *
  * Reddit returns a two-element array: [postListing, commentsListing].
  */
@@ -152,16 +145,10 @@ export async function getComments(
   postId: string,
   signal?: AbortSignal
 ): Promise<CommentsResponse> {
-  // 1. Always build the canonical Reddit URL first
   // Subreddit is optional: omitting it uses Reddit's global /comments/{id} endpoint
-  let endpoint = subreddit
+  const endpoint = subreddit
     ? REDDIT_BASE + "/r/" + encodeURIComponent(subreddit) + "/comments/" + encodeURIComponent(postId) + ".json?raw_json=1&limit=200"
     : REDDIT_BASE + "/comments/" + encodeURIComponent(postId) + ".json?raw_json=1&limit=200";
-
-  // 2. On web: route through the Cloudflare Edge Worker (bypasses Reddit's datacenter IP blocks).
-  if (Platform.OS === "web") {
-    endpoint = "https://reddit-pwa-proxy.kfp1016.workers.dev/?url=" + encodeURIComponent(endpoint);
-  }
 
   const raw = await redditFetch<any[]>(endpoint, signal);
 
