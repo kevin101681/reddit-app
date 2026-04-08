@@ -92,6 +92,13 @@ export default function FeedScreen() {
   const [isFabVisible, setIsFabVisible] = useState(true);
   const lastScrollY = useRef(0);
 
+  const handleScroll = (event: any) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    if (currentY > lastScrollY.current + 15 && isFabVisible) setIsFabVisible(false);
+    else if (currentY < lastScrollY.current - 15 && !isFabVisible) setIsFabVisible(true);
+    lastScrollY.current = currentY;
+  };
+
   useEffect(() => {
     let cancelled = false;
     getFavorites().then((favs) => { if (!cancelled) setIsFavorited(favs.includes(sub.toLowerCase())); });
