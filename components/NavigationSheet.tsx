@@ -104,8 +104,14 @@ export function NavigationSheet({
     if (!sub) return;
     setIsMenuOpen(false);
     setMenuInput("");
-    const navigate = pathname === "/" ? router.push : router.replace;
-    setTimeout(() => navigate({ pathname: "/feed", params: { subreddit: sub } }), 50);
+    // Give the UI thread 100ms to settle the menu state before replacing the native screen
+    setTimeout(() => {
+      if (pathname === "/") {
+        router.push({ pathname: "/feed", params: { subreddit: sub } });
+      } else {
+        router.replace({ pathname: "/feed", params: { subreddit: sub } });
+      }
+    }, 100);
   }
 
   function handleSortChip(value: string) {
