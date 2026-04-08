@@ -5,6 +5,7 @@ import {
   Pressable,
   Image,
   Linking,
+  Modal,
   StyleSheet,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
@@ -50,6 +51,8 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
 
   const [isTextExpanded, setIsTextExpanded] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerImageUrl, setViewerImageUrl] = useState<string | null>(null);
 
   // HLS carries audio; prefer it over the silent fallback_url dash stream
   const nativeVideoUrl =
@@ -141,6 +144,33 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
     if (post.url) Linking.openURL(post.url).catch(() => {});
   }
 
+  function renderImageViewer() {
+    return (
+      <Modal
+        visible={viewerVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setViewerVisible(false)}
+      >
+        <View style={styles.viewerOverlay}>
+          <Image
+            source={{ uri: viewerImageUrl ?? undefined }}
+            style={styles.viewerImage}
+            resizeMode="contain"
+          />
+          <Pressable
+            onPress={() => setViewerVisible(false)}
+            style={styles.viewerClose}
+            accessibilityLabel="Close image viewer"
+            accessibilityRole="button"
+          >
+            <MaterialIcons name="close" size={28} color="#fff" />
+          </Pressable>
+        </View>
+      </Modal>
+    );
+  }
+
   function renderFooter() {
     return (
       <View style={styles.footer}>
@@ -191,93 +221,114 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
 
   if (viewMode === "compact") {
     return (
-      <View style={cardStyle}>
-        <View style={styles.linkRow}>
-          <View style={styles.linkTextArea}>{titleEl}</View>
-          {compactThumb ? (
-            <Image source={{ uri: compactThumb }} style={styles.thumbnail} resizeMode="cover" />
-          ) : (
-            <View style={[styles.thumbnail, { backgroundColor: theme.surfaceElevated }]} />
-          )}
+      <>
+        <View style={cardStyle}>
+          <View style={styles.linkRow}>
+            <View style={styles.linkTextArea}>{titleEl}</View>
+            {compactThumb ? (
+              <Image source={{ uri: compactThumb }} style={styles.thumbnail} resizeMode="cover" />
+            ) : (
+              <View style={[styles.thumbnail, { backgroundColor: theme.surfaceElevated }]} />
+            )}
+          </View>
+          {renderFooter()}
         </View>
-        {renderFooter()}
-      </View>
+        {renderImageViewer()}
+      </>
     );
   }
 
   if (isTypeA) {
     return (
-      <View style={cardStyle}>
-        {titleEl}
-        {showVideo ? (
-          <View style={styles.videoContainer}>
-            <VideoView
-              player={player}
-              style={styles.video}
-              contentFit="contain"
-              nativeControls={false}
-            />
-            <Pressable
-              style={styles.muteBtn}
-              onPress={() => { player.muted = !isMuted; setIsMuted((prev) => !prev); }}
-              accessibilityLabel={isMuted ? "Unmute video" : "Mute video"}
-              accessibilityRole="button"
-            >
-              <MaterialIcons
-                name={isMuted ? "volume-off" : "volume-up"}
-                size={22}
-                color="#fff"
+      <>
+        <View style={cardStyle}>
+          {titleEl}
+          {showVideo ? (
+            <View style={styles.videoContainer}>
+              <VideoView
+                player={player}
+                style={styles.video}
+                contentFit="contain"
+                nativeControls={false}
               />
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: previewImageUrl! }}
-              style={[styles.image, { aspectRatio: imageAspectRatio }]}
-              resizeMode="contain"
-            />
-          </View>
-        )}
-        {renderFooter()}
-      </View>
+              <Pressable
+                style={styles.muteBtn}
+                onPress={() => { player.muted = !isMuted; setIsMuted((prev) => !prev); }}
+                accessibilityLabel={isMuted ? "Unmute video" : "Mute video"}
+                accessibilityRole="button"
+              >
+                <MaterialIcons
+                  name={isMuted ? "volume-off" : "volume-up"}
+                  size={22}
+                  color="#fff"
+                />
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.imageContainer}>
+              <Pressable
+                onPress={() => { setViewerImageUrl(previewImageUrl!); setViewerVisible(true); }}
+                accessibilityLabel="View image fullscreen"
+                accessibilityRole="button"
+              >
+                <Image
+                  source={{ uri: previewImageUrl! }}
+                  style={[styles.image, { aspectRatio: imageAspectRatio }]}
+                  resizeMode="contain"
+                />
+              </Pressable>
+            </View>
+          )}
+          {renderFooter()}
+        </View>
+        {renderImageViewer()}
+      </>
     );
   }
 
   if (isTypeB) {
     return (
-      <View style={cardStyle}>
-        <View style={styles.linkRow}>
-          <Pressable style={styles.linkTextArea} onPress={openExternalLink}>
-            {titleEl}
-            <Text style={[styles.linkDomain, { color: theme.textMuted }]} numberOfLines={1}>
-              {(() => { try { return new URL(post.url).hostname.replace(/^www\./, ""); } catch { return post.url; } })()}
-            </Text>
-          </Pressable>
-          <Image source={{ uri: post.thumbnail }} style={styles.thumbnail} resizeMode="cover" />
+      <>
+        <View style={cardStyle}>
+          <View style={styles.linkRow}>
+            <Pressable style={styles.linkTextArea} onPress={openExternalLink}>
+              {titleEl}
+              <Text style={[styles.linkDomain, { color: theme.textMuted }]} numberOfLines={1}>
+                {(() => { try { return new URL(post.url).hostname.replace(/^www\./, ""); } catch { return post.url; } })()}
+              </Text>
+            </Pressable>
+            <Image source={{ uri: post.thumbnail }} style={styles.thumbnail} resizeMode="cover" />
+          </View>
+          {renderFooter()}
         </View>
-        {renderFooter()}
-      </View>
+        {renderImageViewer()}
+      </>
     );
   }
 
   if (isTypeC) {
     return (
-      <View style={cardStyle}>
-        {titleEl}
-        <Text style={[styles.selftext, { color: theme.textMuted }]} numberOfLines={isTextExpanded ? undefined : 3}>
-          {post.selftext.trim()}
-        </Text>
-        {renderFooter()}
-      </View>
+      <>
+        <View style={cardStyle}>
+          {titleEl}
+          <Text style={[styles.selftext, { color: theme.textMuted }]} numberOfLines={isTextExpanded ? undefined : 3}>
+            {post.selftext.trim()}
+          </Text>
+          {renderFooter()}
+        </View>
+        {renderImageViewer()}
+      </>
     );
   }
 
   return (
-    <View style={cardStyle}>
-      {titleEl}
-      {renderFooter()}
-    </View>
+    <>
+      <View style={cardStyle}>
+        {titleEl}
+        {renderFooter()}
+      </View>
+      {renderImageViewer()}
+    </>
   );
 }
 
@@ -376,5 +427,21 @@ const styles = StyleSheet.create({
     padding: Spacing.xs,
     borderRadius: Radius.sm,
     marginLeft: Spacing.xs,
+  },
+  viewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewerImage: {
+    width: '100%',
+    height: '80%',
+  },
+  viewerClose: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    padding: 8,
   },
 });

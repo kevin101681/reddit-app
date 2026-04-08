@@ -21,19 +21,6 @@ const getTimeAgo = (timestamp: number): string => {
   if (interval > 1) return Math.floor(interval) + 'm ago';
   return 'just now';
 };
-// Cold-tone depth palette — cycles via modulo for deeper nesting
-const DEPTH_COLORS = [
-  '#7ba0b3', // 0
-  '#5a879d', // 1
-  '#457287', // 2
-  '#345e72', // 3
-  '#264a5c', // 4
-  '#1b3847', // 5+
-];
-
-function depthColor(depth: number): string {
-  return DEPTH_COLORS[depth % DEPTH_COLORS.length];
-}
 // Matches bare image URLs on their own line (Reddit CDN + common image hosts).
 // These are stripped from the Markdown body text so they don't render as plain
 // text links alongside the inline <Image> previews already rendered below.
@@ -44,12 +31,12 @@ function openLink(url: string): boolean {
   return true;
 }
 
-function useCommentMdStyles(depth: number) {
+function useCommentMdStyles(depth: number, themeName: string) {
   return useMemo(() => {
     const fontSize   = Math.max(Typography.sm, Typography.md - Math.floor(depth / 3));
     const lineHeight = fontSize + 9;
-    return buildMarkdownStyles({ fontSize, lineHeight });
-  }, [depth]);
+    return buildMarkdownStyles({ fontSize, lineHeight, themeName });
+  }, [depth, themeName]);
 }
 
 interface CommentThreadProps {
@@ -61,20 +48,31 @@ export const CommentThread = memo(function CommentThread({
   comment,
   depth = 0,
 }: CommentThreadProps) {
-  const { theme } = useTheme();
+  const { theme, themeName } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const mdStyles = useCommentMdStyles(depth);
+  const mdStyles = useCommentMdStyles(depth, themeName);
+
+  const commentColors = themeName === 'dark' ? {
+    background: '#1e1e1e',
+    text: '#fff',
+    author: '#a0a0a0',
+    line: '#505050',
+  } : {
+    background: '#fff',
+    text: '#000',
+    author: '#333',
+    line: '#e0e0e0',
+  };
 
   if (!comment.body || comment.body === '[deleted]' || comment.body === '[removed]') {
     return null;
   }
 
-  const color      = depthColor(depth);
   const replyCount = comment.replies?.length ?? 0;
 
   // Left border encodes nesting depth; no margin stacking keeps deep nesting readable
   const nestedStyle = depth > 0
-    ? { borderLeftWidth: 3, borderLeftColor: color, paddingLeft: Spacing.sm }
+    ? { borderLeftWidth: 3, borderLeftColor: commentColors.line, paddingLeft: Spacing.sm }
     : undefined;
 
   // Strip bare image URL lines and markdown image syntax from the body so they
@@ -104,7 +102,7 @@ export const CommentThread = memo(function CommentThread({
   // -- Expanded --------------------------------------------------------------
   return (
     <View style={[styles.container, nestedStyle]}>
-      <View style={[styles.card, { backgroundColor: theme.surface }]}>
+      <View style={[styles.card, { backgroundColor: commentColors.background }]}>
 
         {/* Blank 24px tap strip at the top of every card to collapse */}
         <Pressable
@@ -116,13 +114,13 @@ export const CommentThread = memo(function CommentThread({
 
         {/* Author + time */}
         <View style={styles.commentMeta}>
-          <Text style={[styles.commentAuthor, { color: theme.brand }]}>{"u/" + comment.author}</Text>
-          <Text style={[styles.commentTime, { color: theme.textMuted }]}>{" \u00b7 " + getTimeAgo(comment.created_utc)}</Text>
+          <Text style={[styles.commentAuthor, { color: commentColors.author }]}>{"u/" + comment.author}</Text>
+          <Text style={[styles.commentTime, { color: commentColors.author }]}>{" \u00b7 " + getTimeAgo(comment.created_utc)}</Text>
         </View>
 
         {/* Comment body */}
         <Markdown
-          style={mdStyles}
+          style={{ ...mdStyles, body: { ...mdStyles.body, color: commentColors.text }, paragraph: { ...mdStyles.paragraph, color: commentColors.text } }}
           onLinkPress={openLink}
           rules={suppressImageRule}
         >
