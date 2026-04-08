@@ -122,7 +122,7 @@ export function NavigationSheet({
         top:             0,
         bottom:          0,
         right:           0,
-        width:           320,
+        width:           340,
         zIndex:          100,
         borderLeftWidth: 1,
         borderColor:     theme.border,
@@ -294,10 +294,7 @@ export function NavigationSheet({
             )}
 
             {/* Header row — close button */}
-            <View style={[styles.menuHeader, isDesktop && styles.menuHeaderDesktop]}>
-              {isDesktop && (
-                <Text style={[styles.desktopTitle, { color: theme.text }]}>Menu</Text>
-              )}
+            <View style={[styles.menuHeader]}>
               <Pressable
                 style={({ pressed }) => [
                   styles.menuClose,
@@ -309,7 +306,7 @@ export function NavigationSheet({
                 accessibilityLabel="Close menu"
                 accessibilityRole="button"
               >
-                <Text style={[styles.menuCloseText, { color: theme.textMuted }]}>{"?"}</Text>
+                <MaterialIcons name="close" size={20} color={theme.textMuted} />
               </Pressable>
             </View>
 
@@ -336,22 +333,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: Spacing.xs,
   },
-  menuHeaderDesktop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    marginBottom: Spacing.sm,
-  },
-  desktopTitle: { fontSize: Typography.lg, fontWeight: "700" },
   menuClose: {
     width: 30, height: 30, borderRadius: 15,
     alignItems: "center", justifyContent: "center",
   },
   menuClosePressed: { opacity: 0.6 },
-  menuCloseText: { fontSize: Typography.md, lineHeight: 18 },
-
   controlRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.lg },
   controlBtn: {
     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",

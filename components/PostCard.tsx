@@ -1,4 +1,4 @@
-﻿import React, { memo, useEffect, useState } from "react";
+import React, { memo, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,21 @@ import { Colors, Spacing, Typography, Radius } from "../constants/theme";
 import { AppTheme, useTheme } from "../utils/ThemeContext";
 
 const BRAND = "#7ba0b3";
+const getTimeAgo = (timestamp: number): string => {
+  if (!timestamp) return '';
+  const seconds = Math.floor(Date.now() / 1000) - timestamp;
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + 'y ago';
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + 'mo ago';
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + 'd ago';
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + 'h ago';
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + 'm ago';
+  return 'just now';
+};
 
 const SENTINEL_THUMBNAILS = new Set(["self", "default", "nsfw", "spoiler", "image", ""]);
 
@@ -25,7 +40,7 @@ interface PostCardProps {
   activePostId?: string | null;
   viewMode?: ViewMode;
   currentTheme?: AppTheme;
-  /** Override navigation — used by split-screen to select a post without pushing a route */
+  /** Override navigation � used by split-screen to select a post without pushing a route */
   onPress?: () => void;
 }
 
@@ -129,9 +144,14 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
   function renderFooter() {
     return (
       <View style={styles.footer}>
-        <Text style={[styles.subreddit, { color: theme.brand }]} numberOfLines={1}>
-          {post.subreddit_name_prefixed}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.subreddit, { color: theme.brand }]} numberOfLines={1}>
+            {post.subreddit_name_prefixed}
+          </Text>
+          <Text style={[styles.postMeta, { color: theme.textMuted }]} numberOfLines={1}>
+            {"u/" + post.author + " \u00b7 " + getTimeAgo(post.created_utc)}
+          </Text>
+        </View>
 
         {isTypeC && (
           <Pressable
@@ -347,11 +367,11 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   subreddit: {
-    flex: 1,
     color: Colors.brand,
     fontSize: Typography.xs,
     fontWeight: "700",
   },
+  postMeta: { fontSize: 11, marginTop: 1 },
   footerBtn: {
     padding: Spacing.xs,
     borderRadius: Radius.sm,

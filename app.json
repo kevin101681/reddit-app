@@ -3,7 +3,7 @@
     "name": "Personal Reddit",
     "slug": "personal-reddit-app",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "scheme": "personalreddit",

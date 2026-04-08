@@ -1,12 +1,27 @@
-﻿import React, { memo, useMemo, useState } from 'react';
-import { View, Pressable, StyleSheet, Linking, Image } from 'react-native';
+import React, { memo, useMemo, useState } from 'react';
+import { View, Text, Pressable, StyleSheet, Linking, Image } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { RedditComment } from '../utils/types';
 import { buildMarkdownStyles, suppressImageRule } from '../utils/markdownStyles';
 import { Colors, Typography, Spacing, Radius } from '../constants/theme';
 import { useTheme } from '../utils/ThemeContext';
 
-// Cold-tone depth palette — cycles via modulo for deeper nesting
+const getTimeAgo = (timestamp: number): string => {
+  if (!timestamp) return '';
+  const seconds = Math.floor(Date.now() / 1000) - timestamp;
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + 'y ago';
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + 'mo ago';
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + 'd ago';
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + 'h ago';
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + 'm ago';
+  return 'just now';
+};
+// Cold-tone depth palette � cycles via modulo for deeper nesting
 const DEPTH_COLORS = [
   '#7ba0b3', // 0
   '#5a879d', // 1
@@ -72,7 +87,7 @@ export const CommentThread = memo(function CommentThread({
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  // ── Collapsed: show only the depth border + blank tap target ─────────────
+  // -- Collapsed: show only the depth border + blank tap target -------------
   if (isCollapsed) {
     return (
       <View style={[styles.container, nestedStyle]}>
@@ -86,7 +101,7 @@ export const CommentThread = memo(function CommentThread({
     );
   }
 
-  // ── Expanded ──────────────────────────────────────────────────────────────
+  // -- Expanded --------------------------------------------------------------
   return (
     <View style={[styles.container, nestedStyle]}>
       <View style={[styles.card, { backgroundColor: theme.surface }]}>
@@ -98,6 +113,12 @@ export const CommentThread = memo(function CommentThread({
           accessibilityRole="button"
           accessibilityLabel="Collapse comment"
         />
+
+        {/* Author + time */}
+        <View style={styles.commentMeta}>
+          <Text style={[styles.commentAuthor, { color: theme.brand }]}>{"u/" + comment.author}</Text>
+          <Text style={[styles.commentTime, { color: theme.textMuted }]}>{" \u00b7 " + getTimeAgo(comment.created_utc)}</Text>
+        </View>
 
         {/* Comment body */}
         <Markdown
@@ -155,7 +176,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   // Invisible full-width tap strip used for both expand (collapsed state)
-  // and collapse (top of expanded card) — no text, just touch area.
+  // and collapse (top of expanded card) � no text, just touch area.
   collapseTarget: {
     height: 24,
     width: '100%',
@@ -169,4 +190,7 @@ const styles = StyleSheet.create({
   replies: {
     marginTop: Spacing.xs,
   },
+  commentMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  commentAuthor: { fontSize: 12, fontWeight: '700' },
+  commentTime: { fontSize: 12 },
 });

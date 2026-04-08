@@ -49,6 +49,8 @@ export default function FrontpageScreen() {
   const [activePostId, setActivePostId]   = useState<string | null>(null);
   const [selectedPost, setSelectedPost]   = useState<RedditPost | null>(null);
   const [isMenuOpen, setIsMenuOpen]       = useState(false);
+  const [isFabVisible, setIsFabVisible]   = useState(true);
+  const lastScrollY = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
   // ── Viewability ─────────────────────────────────────────────────────────────
@@ -141,6 +143,13 @@ export default function FrontpageScreen() {
     [activePostId, viewMode, theme, isDesktop]
   );
 
+  const handleScroll = (event: any) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    if (currentY > lastScrollY.current + 15 && isFabVisible) setIsFabVisible(false);
+    else if (currentY < lastScrollY.current - 15 && !isFabVisible) setIsFabVisible(true);
+    lastScrollY.current = currentY;
+  };
+
   // ── Feed column ──────────────────────────────────────────────────────────────
   const renderFeed = () => {
     if (loading) {
@@ -185,6 +194,7 @@ export default function FrontpageScreen() {
         viewabilityConfig={viewabilityConfig}
         onViewableItemsChanged={onViewableItemsChanged}
         scrollEventThrottle={16}
+        onScroll={handleScroll}
         removeClippedSubviews
         initialNumToRender={10}
         maxToRenderPerBatch={10}
@@ -259,14 +269,14 @@ export default function FrontpageScreen() {
         )}
       </View>
 
-      {!isDesktop && (
+      {isFabVisible && !isDesktop && (
         <Pressable
           onPress={() => setIsMenuOpen(true)}
-          style={{ position: "absolute", bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: "#333", justifyContent: "center", alignItems: "center", elevation: 4 }}
+          style={{ position: "absolute", bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: themeName === "dark" ? "#fff" : "#333", justifyContent: "center", alignItems: "center", elevation: 4 }}
           accessibilityLabel="Open menu"
           accessibilityRole="button"
         >
-          <MaterialIcons name="menu" size={24} color="#fff" />
+          <MaterialIcons name="menu" size={24} color={themeName === "dark" ? "#000" : "#fff"} />
         </Pressable>
       )}
 

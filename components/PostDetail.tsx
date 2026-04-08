@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -23,11 +23,11 @@ import { NavigationSheet } from "./NavigationSheet";
 const BRAND    = "#7ba0b3";
 const FAB_SIZE = 56;
 
-// ── Props ─────────────────────────────────────────────────────────────────────
+// -- Props ---------------------------------------------------------------------
 
 interface PostDetailProps {
   postId: string;
-  /** Optional — omitting uses Reddit global /comments/{postId} endpoint */
+  /** Optional � omitting uses Reddit global /comments/{postId} endpoint */
   subreddit?: string;
   /** Display title for the nav header */
   subredditNamePrefixed?: string;
@@ -38,7 +38,7 @@ interface PostDetailProps {
   embedded?: boolean;
 }
 
-// ── Comment skeleton ───────────────────────────────────────────────────────────
+// -- Comment skeleton -----------------------------------------------------------
 
 function CommentSkeleton() {
   return (
@@ -54,7 +54,7 @@ function CommentSkeleton() {
   );
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// -- Component -----------------------------------------------------------------
 
 export default function PostDetail({
   postId,
@@ -67,7 +67,7 @@ export default function PostDetail({
 
   const isExternalLink = !!url && url.length > 0 && !/reddit\.com/i.test(url);
 
-  // ── Comments state ─────────────────────────────────────────────────────────
+  // -- Comments state ---------------------------------------------------------
   const [comments, setComments]               = useState<RedditComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [commentsError, setCommentsError]     = useState<string | null>(null);
@@ -99,7 +99,7 @@ export default function PostDetail({
 
   const topLevelComments = comments.filter((c) => c.depth === 0 || c.depth === undefined);
 
-  // ── FAB hide-on-scroll animation ──────────────────────────────────────────
+  // -- FAB hide-on-scroll animation ------------------------------------------
   const fabTranslateY = useRef(new Animated.Value(0)).current;
   const isFabHidden   = useRef(false);
   const lastScrollY   = useRef(0);
@@ -125,7 +125,7 @@ export default function PostDetail({
     }
   }
 
-  // ── Render helpers ────────────────────────────────────────────────────────
+  // -- Render helpers --------------------------------------------------------
   function renderComment({ item }: { item: RedditComment }) {
     return (
       <View style={styles.commentWrap}>
@@ -141,7 +141,7 @@ export default function PostDetail({
     if (commentsError) {
       return (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{"⚠️ " + commentsError}</Text>
+          <Text style={styles.errorText}>{"?? " + commentsError}</Text>
         </View>
       );
     }
@@ -158,12 +158,12 @@ export default function PostDetail({
     return <View style={{ height: isExternalLink ? FAB_SIZE + fabPaddingBottom + 24 : Spacing.xxl }} />;
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // -- Render ----------------------------------------------------------------
   return (
     <View style={styles.screen}>
-      {/* Stack.Screen header — omit when embedded in a split pane */}
+      {/* Stack.Screen header � omit when embedded in a split pane */}
       {!embedded && (
-        <Stack.Screen options={{ title: subredditNamePrefixed ?? (subreddit ? ("r/" + subreddit) : "Comments") }} />
+        <Stack.Screen options={{ headerBackVisible: false, headerLeft: () => null, title: subredditNamePrefixed ?? (subreddit ? ("r/" + subreddit) : "Comments") }} />
       )}
 
       {commentsLoading && topLevelComments.length === 0 ? (
@@ -204,13 +204,13 @@ export default function PostDetail({
         </Animated.View>
       )}
 
-      {/* NavigationSheet FAB — omit when embedded (parent screen already has one) */}
+      {/* NavigationSheet FAB � omit when embedded (parent screen already has one) */}
       {!embedded && <NavigationSheet />}
     </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// -- Styles --------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: Colors.background },

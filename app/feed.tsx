@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -39,7 +39,7 @@ export default function FeedScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 850;
 
-  // ── Preferences ─────────────────────────────────────────────────────────────
+  // -- Preferences -------------------------------------------------------------
   const [sort, setSort]         = useState("hot");
   const [viewMode, setViewMode] = useState<"standard" | "compact">("standard");
 
@@ -66,7 +66,7 @@ export default function FeedScreen() {
     });
   }, [sub]);
 
-  // ── Viewability ─────────────────────────────────────────────────────────────
+  // -- Viewability -------------------------------------------------------------
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
   const [activePostId, setActivePostId]   = useState<string | null>(null);
   const [selectedPost, setSelectedPost]   = useState<RedditPost | null>(null);
@@ -76,7 +76,7 @@ export default function FeedScreen() {
     }
   ).current;
 
-  // ── Feed state ──────────────────────────────────────────────────────────────
+  // -- Feed state --------------------------------------------------------------
   const [posts, setPosts]           = useState<RedditPost[]>([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -86,9 +86,11 @@ export default function FeedScreen() {
   const [error, setError]           = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // ── Favourite state ─────────────────────────────────────────────────────────
+  // -- Favourite state ---------------------------------------------------------
   const [isFavorited, setIsFavorited] = useState(false);
   const [isMenuOpen, setIsMenuOpen]   = useState(false);
+  const [isFabVisible, setIsFabVisible] = useState(true);
+  const lastScrollY = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,7 +103,7 @@ export default function FeedScreen() {
     else             { await addFavorite(sub);    setIsFavorited(true); }
   }
 
-  // ── Data fetching ───────────────────────────────────────────────────────────
+  // -- Data fetching -----------------------------------------------------------
   const fetchPosts = useCallback(
     async (reset: boolean, cursor?: string) => {
       abortRef.current?.abort();
@@ -160,7 +162,7 @@ export default function FeedScreen() {
     [activePostId, viewMode, theme, isDesktop]
   );
 
-  // ── Feed column ─────────────────────────────────────────────────────────────
+  // -- Feed column -------------------------------------------------------------
   const renderFeed = () => {
     if (loading) {
       return (
@@ -172,7 +174,7 @@ export default function FeedScreen() {
     if (error && posts.length === 0) {
       return (
         <View style={[styles.center, { backgroundColor: theme.background }]}>
-          <Text style={styles.errorIcon}>{"⚠️"}</Text>
+          <Text style={styles.errorIcon}>{"??"}</Text>
           <Text style={[styles.errorTitle, { color: theme.text }]}>{"Could not load r/" + sub}</Text>
           <Text style={[styles.errorMessage, { color: theme.textMuted }]}>{error}</Text>
           <Text style={[styles.retryHint, { color: theme.textMuted }]}>Pull down to retry</Text>
@@ -204,6 +206,7 @@ export default function FeedScreen() {
         viewabilityConfig={viewabilityConfig}
         onViewableItemsChanged={onViewableItemsChanged}
         scrollEventThrottle={16}
+        onScroll={handleScroll}
         removeClippedSubviews
         initialNumToRender={10}
         maxToRenderPerBatch={10}
@@ -211,7 +214,7 @@ export default function FeedScreen() {
         ListHeaderComponent={
           error ? (
             <View style={[styles.errorBanner, { backgroundColor: theme.surface }]}>
-              <Text style={[styles.errorBannerText, { color: theme.textMuted }]}>{"⚠️ " + error}</Text>
+              <Text style={[styles.errorBannerText, { color: theme.textMuted }]}>{"?? " + error}</Text>
             </View>
           ) : null
         }
@@ -230,6 +233,8 @@ export default function FeedScreen() {
           headerStyle: { backgroundColor: theme.surface },
           headerTintColor: theme.text,
           headerTitleStyle: { fontWeight: "700", color: theme.text },
+          headerBackVisible: false,
+          headerLeft: () => null,
           headerRight: () => (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Pressable
@@ -269,7 +274,7 @@ export default function FeedScreen() {
           {renderFeed()}
         </View>
 
-        {/* Right: post detail pane — desktop only */}
+        {/* Right: post detail pane � desktop only */}
         {isDesktop && (
           <View style={[styles.fillContainer, { backgroundColor: theme.background }]}>
             {selectedPost ? (
@@ -291,14 +296,14 @@ export default function FeedScreen() {
         )}
       </View>
 
-      {!isDesktop && (
+      {isFabVisible && !isDesktop && (
         <Pressable
           onPress={() => setIsMenuOpen(true)}
-          style={{ position: "absolute", bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: "#333", justifyContent: "center", alignItems: "center", elevation: 4 }}
+          style={{ position: "absolute", bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: themeName === "dark" ? "#fff" : "#333", justifyContent: "center", alignItems: "center", elevation: 4 }}
           accessibilityLabel="Open menu"
           accessibilityRole="button"
         >
-          <MaterialIcons name="menu" size={24} color="#fff" />
+          <MaterialIcons name="menu" size={24} color={themeName === "dark" ? "#000" : "#fff"} />
         </Pressable>
       )}
 
