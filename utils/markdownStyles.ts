@@ -59,8 +59,8 @@ export function buildMarkdownStyles({
 
     // Blockquote
     blockquote: {
-      backgroundColor: Colors.surfaceElevated,
-      borderLeftColor: Colors.border,
+      backgroundColor: themeName === 'dark' ? Colors.surfaceElevated : '#f0f0f0',
+      borderLeftColor: themeName === 'dark' ? Colors.border : '#cccccc',
       borderLeftWidth: 3,
       paddingLeft: Spacing.sm,
       paddingVertical: Spacing.xs,
@@ -70,8 +70,8 @@ export function buildMarkdownStyles({
 
     // Inline code
     code_inline: {
-      backgroundColor: Colors.surfaceElevated,
-      color: '#46d160',
+      backgroundColor: themeName === 'dark' ? Colors.surfaceElevated : '#f0f0f0',
+      color: themeName === 'dark' ? '#46d160' : '#007700',
       fontFamily: MONO,
       fontSize: fontSize - 1,
       borderRadius: Radius.sm,
@@ -80,8 +80,8 @@ export function buildMarkdownStyles({
 
     // Fenced / block code
     fence: {
-      backgroundColor: Colors.surfaceElevated,
-      color: '#46d160',
+      backgroundColor: themeName === 'dark' ? Colors.surfaceElevated : '#f0f0f0',
+      color: themeName === 'dark' ? '#46d160' : '#007700',
       fontFamily: MONO,
       fontSize: fontSize - 1,
       borderRadius: Radius.md,
@@ -89,8 +89,8 @@ export function buildMarkdownStyles({
       marginVertical: Spacing.sm,
     },
     code_block: {
-      backgroundColor: Colors.surfaceElevated,
-      color: '#46d160',
+      backgroundColor: themeName === 'dark' ? Colors.surfaceElevated : '#f0f0f0',
+      color: themeName === 'dark' ? '#46d160' : '#007700',
       fontFamily: MONO,
       fontSize: fontSize - 1,
       borderRadius: Radius.md,

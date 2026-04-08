@@ -9,6 +9,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
+import { Video, ResizeMode } from "expo-av";
 import { router } from "expo-router";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { RedditPost } from "../utils/types";
@@ -52,7 +53,7 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
   const [isTextExpanded, setIsTextExpanded] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [viewerVisible, setViewerVisible] = useState(false);
-  const [viewerImageUrl, setViewerImageUrl] = useState<string | null>(null);
+  const [viewerMedia, setViewerMedia] = useState<{ url: string | null; isVideo: boolean }>({ url: null, isVideo: false });
 
   // HLS carries audio; prefer it over the silent fallback_url dash stream
   const nativeVideoUrl =
@@ -153,15 +154,26 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
         onRequestClose={() => setViewerVisible(false)}
       >
         <View style={styles.viewerOverlay}>
-          <Image
-            source={{ uri: viewerImageUrl ?? undefined }}
-            style={styles.viewerImage}
-            resizeMode="contain"
-          />
+          {viewerMedia.isVideo ? (
+            <Video
+              style={styles.viewerImage}
+              source={viewerMedia.url ? { uri: viewerMedia.url } : undefined}
+              useNativeControls
+              resizeMode={ResizeMode.CONTAIN}
+              isLooping
+              shouldPlay
+            />
+          ) : (
+            <Image
+              source={{ uri: viewerMedia.url ?? undefined }}
+              style={styles.viewerImage}
+              resizeMode="contain"
+            />
+          )}
           <Pressable
             onPress={() => setViewerVisible(false)}
             style={styles.viewerClose}
-            accessibilityLabel="Close image viewer"
+            accessibilityLabel="Close viewer"
             accessibilityRole="button"
           >
             <MaterialIcons name="close" size={28} color="#fff" />
@@ -267,7 +279,17 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
           ) : (
             <View style={styles.imageContainer}>
               <Pressable
-                onPress={() => { setViewerImageUrl(previewImageUrl!); setViewerVisible(true); }}
+                onPress={() => {
+                  const vidUrl = post.secure_media?.reddit_video?.fallback_url
+                    ?? post.preview?.reddit_video_preview?.fallback_url
+                    ?? null;
+                  const isGifOrVideo = !!vidUrl
+                    || /\.(mp4|gifv)(\?.*)?$/i.test(post.url ?? "");
+                  const finalUrl = vidUrl
+                    ?? (post.url ?? "").replace(/\.gifv(\?.*)?$/i, ".mp4");
+                  setViewerMedia({ url: isGifOrVideo ? finalUrl : previewImageUrl!, isVideo: isGifOrVideo });
+                  setViewerVisible(true);
+                }}
                 accessibilityLabel="View image fullscreen"
                 accessibilityRole="button"
               >

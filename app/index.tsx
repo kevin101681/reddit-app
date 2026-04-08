@@ -272,11 +272,11 @@ export default function FrontpageScreen() {
       {isFabVisible && !isDesktop && (
         <Pressable
           onPress={() => setIsMenuOpen(true)}
-          style={{ position: "absolute", bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: themeName === "dark" ? "#fff" : "#333", justifyContent: "center", alignItems: "center", elevation: 4 }}
+          style={{ position: "absolute", bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: themeName === "dark" ? "#333" : "#fff", justifyContent: "center", alignItems: "center", elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84 }}
           accessibilityLabel="Open menu"
           accessibilityRole="button"
         >
-          <MaterialIcons name="menu" size={24} color={themeName === "dark" ? "#000" : "#fff"} />
+          <MaterialIcons name="menu" size={24} color={themeName === "dark" ? "#fff" : "#000"} />
         </Pressable>
       )}
 
