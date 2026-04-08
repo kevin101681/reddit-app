@@ -21,10 +21,10 @@ function navigate(subreddit: string) {
   const sub = subreddit.trim().replace(/^r\//i, '');
   if (!sub) return;
   router.dismiss();
-  // Small defer so the modal can animate out first
+  // Give the UI thread 100ms to settle the menu state before replacing the native screen
   setTimeout(() => {
     router.push({ pathname: '/feed', params: { subreddit: sub } });
-  }, 50);
+  }, 100);
 }
 
 export default function MenuScreen() {
