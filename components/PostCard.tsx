@@ -9,7 +9,6 @@ import {
   StyleSheet,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
-import { Video, ResizeMode } from "expo-av";
 import { router } from "expo-router";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { RedditPost } from "../utils/types";
@@ -75,6 +74,11 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
     p.loop   = true;
     p.muted  = true;
   });
+  // Separate player for the fullscreen modal viewer
+  const viewerPlayer = useVideoPlayer(
+    viewerMedia.isVideo ? (viewerMedia.url ?? null) : null,
+    (p) => { p.loop = true; p.muted = false; }
+  );
 
   useEffect(() => {
     if (!videoUrl) return;
@@ -155,13 +159,11 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
       >
         <View style={styles.viewerOverlay}>
           {viewerMedia.isVideo ? (
-            <Video
+            <VideoView
+              player={viewerPlayer}
               style={styles.viewerImage}
-              source={viewerMedia.url ? { uri: viewerMedia.url } : undefined}
-              useNativeControls
-              resizeMode={ResizeMode.CONTAIN}
-              isLooping
-              shouldPlay
+              contentFit="contain"
+              nativeControls
             />
           ) : (
             <Image
@@ -256,7 +258,15 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
         <View style={cardStyle}>
           {titleEl}
           {showVideo ? (
-            <Pressable onPress={openPostDetail} accessibilityRole="button" accessibilityLabel="Open post">
+            <Pressable
+              onPress={() => {
+                const url = videoUrl ?? "";
+                setViewerMedia({ url, isVideo: true });
+                setViewerVisible(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="View fullscreen"
+            >
               <View style={styles.videoContainer}>
                 <VideoView
                   player={player}

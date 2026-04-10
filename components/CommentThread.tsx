@@ -1,5 +1,5 @@
 ﻿import React, { memo, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Linking, Image } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Linking, Image, Modal } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { RedditComment } from '../utils/types';
 import { buildMarkdownStyles, suppressImageRule } from '../utils/markdownStyles';
@@ -50,6 +50,7 @@ export const CommentThread = memo(function CommentThread({
 }: CommentThreadProps) {
   const { theme, themeName } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [viewerUrl, setViewerUrl]       = useState<string | null>(null);
   const mdStyles = useCommentMdStyles(depth, themeName);
 
   const commentColors = themeName === 'dark' ? {
@@ -135,17 +136,27 @@ export const CommentThread = memo(function CommentThread({
           return imageMatches.map((rawUrl, i) => {
             const url = rawUrl.replace(/&amp;/g, '&');
             return (
-              <Image
-                key={i}
-                source={{ uri: url }}
-                style={styles.inlineImage}
-                resizeMode="contain"
-              />
+              <Pressable key={i} onPress={() => setViewerUrl(url)} accessibilityRole="button" accessibilityLabel="View image fullscreen">
+                <Image
+                  source={{ uri: url }}
+                  style={styles.inlineImage}
+                  resizeMode="contain"
+                />
+              </Pressable>
             );
           });
         })()}
 
       </View>
+
+      {/* Fullscreen image viewer */}
+      {viewerUrl !== null && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setViewerUrl(null)}>
+          <Pressable style={styles.viewerOverlay} onPress={() => setViewerUrl(null)}>
+            <Image source={{ uri: viewerUrl }} style={styles.viewerImage} resizeMode="contain" />
+          </Pressable>
+        </Modal>
+      )}
 
       {/* Recursive replies */}
       {replyCount > 0 && (
@@ -189,6 +200,13 @@ const styles = StyleSheet.create({
   replies: {
     marginTop: Spacing.xs,
   },
+  viewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewerImage: { width: '100%', height: '80%' },
   commentMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   commentAuthor: { fontSize: 12, fontWeight: '700' },
   commentTime: { fontSize: 12 },

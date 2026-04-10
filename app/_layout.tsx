@@ -26,6 +26,7 @@ function RootStack() {
           contentStyle: { backgroundColor: theme.background },
           animation: 'slide_from_right',
           gestureEnabled: true,
+          gestureDirection: 'horizontal',
           fullScreenGestureEnabled: true,
         }}
       >
