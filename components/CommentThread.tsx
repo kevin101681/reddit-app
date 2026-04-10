@@ -147,6 +147,23 @@ export const CommentThread = memo(function CommentThread({
           });
         })()}
 
+        {/* Images uploaded directly to Reddit (media_metadata) */}
+        {comment.media_metadata && Object.values(comment.media_metadata)
+          .filter((m) => m.e === 'Image' && m.s != null)
+          .map((m, i) => {
+            const url = m.s!.u.replace(/&amp;/g, '&');
+            return (
+              <Pressable key={'mm-' + i} onPress={() => setViewerUrl(url)} accessibilityRole="button" accessibilityLabel="View image">
+                <Image
+                  source={{ uri: url }}
+                  style={{ width: '100%', height: 200, borderRadius: 12, marginTop: 8 }}
+                  resizeMode="contain"
+                />
+              </Pressable>
+            );
+          })
+        }
+
       </View>
 
       {/* Fullscreen image viewer */}

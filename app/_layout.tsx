@@ -44,7 +44,14 @@ function RootStack() {
         />
         <Stack.Screen
           name="post/[id]"
-          options={{ title: 'Post', headerBackTitle: 'Back' }}
+          options={{
+            title: 'Post',
+            headerBackTitle: 'Back',
+            gestureEnabled: true,
+            gestureDirection: 'horizontal',
+            animation: 'slide_from_right',
+            fullScreenGestureEnabled: true,
+          }}
         />
       </Stack>
     </>

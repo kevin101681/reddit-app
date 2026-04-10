@@ -104,7 +104,8 @@ function normalizeComment(child: any, depth = 0): RedditComment | null {
     score:       d.score      ?? 0,
     created_utc: d.created_utc ?? 0,
     depth,
-    replies:     replies.length > 0 ? replies : undefined,
+    replies:          replies.length > 0 ? replies : undefined,
+    media_metadata:   d.media_metadata ?? undefined,
   };
 }
 

@@ -1,4 +1,4 @@
-﻿// Type definitions for Reddit API responses
+// Type definitions for Reddit API responses
 
 export interface RedditPost {
   id: string;
@@ -16,6 +16,10 @@ export interface RedditPost {
     images: Array<{
       source: { url: string; width: number; height: number };
       resolutions: Array<{ url: string; width: number; height: number }>;
+      /** Reddit's server-side GIF→MP4 conversion, present on animated preview images */
+      variants?: {
+        mp4?: { source?: { url: string; width: number; height: number } };
+      };
     }>;
     /** Reddit-hosted GIF-to-video preview (cross-post / preview fallback) */
     reddit_video_preview?: {
@@ -54,6 +58,8 @@ export interface RedditComment {
   created_utc: number;
   depth: number;
   replies?: RedditComment[];
+  /** Reddit-hosted images embedded in the comment (%%imageId%% syntax in body) */
+  media_metadata?: Record<string, { e: string; s?: { u: string; x: number; y: number } }>;
 }
 
 /** Normalised posts page returned by getPosts() */

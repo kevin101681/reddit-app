@@ -60,6 +60,7 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
     post.secure_media?.reddit_video?.fallback_url ??
     post.preview?.reddit_video_preview?.hls_url ??
     post.preview?.reddit_video_preview?.fallback_url ??
+    post.preview?.images?.[0]?.variants?.mp4?.source?.url?.replace(/&amp;/g, "&") ??
     null;
 
   const rawUrl = post.url ?? "";
