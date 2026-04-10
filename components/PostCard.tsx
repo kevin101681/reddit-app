@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useState } from "react";
+ï»¿import React, { memo, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -42,7 +42,7 @@ interface PostCardProps {
   activePostId?: string | null;
   viewMode?: ViewMode;
   currentTheme?: AppTheme;
-  /** Override navigation — used by split-screen to select a post without pushing a route */
+  /** Override navigation ï¿½ used by split-screen to select a post without pushing a route */
   onPress?: () => void;
 }
 
@@ -256,26 +256,28 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
         <View style={cardStyle}>
           {titleEl}
           {showVideo ? (
-            <View style={styles.videoContainer}>
-              <VideoView
-                player={player}
-                style={styles.video}
-                contentFit="contain"
-                nativeControls={false}
-              />
-              <Pressable
-                style={styles.muteBtn}
-                onPress={() => { player.muted = !isMuted; setIsMuted((prev) => !prev); }}
-                accessibilityLabel={isMuted ? "Unmute video" : "Mute video"}
-                accessibilityRole="button"
-              >
-                <MaterialIcons
-                  name={isMuted ? "volume-off" : "volume-up"}
-                  size={22}
-                  color="#fff"
+            <Pressable onPress={openPostDetail} accessibilityRole="button" accessibilityLabel="Open post">
+              <View style={styles.videoContainer}>
+                <VideoView
+                  player={player}
+                  style={styles.video}
+                  contentFit="contain"
+                  nativeControls={false}
                 />
-              </Pressable>
-            </View>
+                <Pressable
+                  style={styles.muteBtn}
+                  onPress={() => { player.muted = !isMuted; setIsMuted((prev) => !prev); }}
+                  accessibilityLabel={isMuted ? "Unmute video" : "Mute video"}
+                  accessibilityRole="button"
+                >
+                  <MaterialIcons
+                    name={isMuted ? "volume-off" : "volume-up"}
+                    size={22}
+                    color="#fff"
+                  />
+                </Pressable>
+              </View>
+            </Pressable>
           ) : (
             <View style={styles.imageContainer}>
               <Pressable

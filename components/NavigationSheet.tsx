@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+ï»¿import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Keyboard,
@@ -33,7 +33,7 @@ interface NavigationSheetProps {
   onSortSelect?: (sort: string) => void;
   viewMode?: "standard" | "compact";
   onViewModeToggle?: () => void;
-  /** Controlled open state — when provided the parent drives open/close */
+  /** Controlled open state ï¿½ when provided the parent drives open/close */
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
@@ -62,6 +62,7 @@ export function NavigationSheet({
   const [menuInput,      setMenuInput]      = useState("");
   const [favorites,      setFavorites]      = useState<string[]>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const swipeStartY = useRef(0);
 
   // -- Manual keyboard height tracking ----------------------------------------
   useEffect(() => {
@@ -121,7 +122,13 @@ export function NavigationSheet({
 
   const showSort  = !!sort && !!onSortSelect;
 
-  // -- Dynamic panel style — bottom sheet on mobile, side drawer on desktop --
+  // Swipe down > 50px on the panel closes the menu (mobile only)
+  const onPanelTouchStart = (e: any) => { swipeStartY.current = e.nativeEvent.pageY; };
+  const onPanelTouchEnd   = (e: any) => {
+    if (!isDesktop && e.nativeEvent.pageY - swipeStartY.current > 50) setIsMenuOpen(false);
+  };
+
+  // -- Dynamic panel style ï¿½ bottom sheet on mobile, side drawer on desktop --
   const panelStyle = isDesktop
     ? {
         position:        "absolute" as const,
@@ -287,19 +294,19 @@ export function NavigationSheet({
     <>
       {isMenuOpen && (
         <>
-          {/* Scrim — closes menu; transparent on desktop so content stays interactive */}
+          {/* Scrim ï¿½ closes menu; transparent on desktop so content stays interactive */}
           <Pressable
             style={[styles.menuScrim, isDesktop && { backgroundColor: "transparent" }]}
             onPress={() => setIsMenuOpen(false)}
           />
 
-          <Animated.View style={panelStyle}>
-            {/* Drag handle — mobile only */}
+          <Animated.View style={panelStyle} onTouchStart={onPanelTouchStart} onTouchEnd={onPanelTouchEnd}>
+            {/* Drag handle ï¿½ mobile only */}
             {!isDesktop && (
               <View style={[styles.menuHandle, { backgroundColor: theme.border }]} />
             )}
 
-            {/* Header row — close button */}
+            {/* Header row ï¿½ close button */}
             <View style={[styles.menuHeader]}>
               <Pressable
                 style={({ pressed }) => [
