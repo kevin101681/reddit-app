@@ -25,6 +25,7 @@ function RootStack() {
           headerTitleStyle: { fontWeight: '700', color: theme.text },
           contentStyle: { backgroundColor: theme.background },
           animation: 'slide_from_right',
+          presentation: 'card',
           gestureEnabled: true,
           gestureDirection: 'horizontal',
           fullScreenGestureEnabled: true,
@@ -50,6 +51,7 @@ function RootStack() {
             gestureEnabled: true,
             gestureDirection: 'horizontal',
             animation: 'slide_from_right',
+            presentation: 'card',
             fullScreenGestureEnabled: true,
           }}
         />

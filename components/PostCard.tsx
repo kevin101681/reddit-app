@@ -3,6 +3,7 @@ import {
   View,
   Text,
   Pressable,
+  TouchableOpacity,
   Image,
   Linking,
   Modal,
@@ -259,13 +260,13 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
         <View style={cardStyle}>
           {titleEl}
           {showVideo ? (
-            <Pressable
+            <TouchableOpacity
+              activeOpacity={0.8}
               onPress={() => {
                 const url = videoUrl ?? "";
                 setViewerMedia({ url, isVideo: true });
                 setViewerVisible(true);
               }}
-              accessibilityRole="button"
               accessibilityLabel="View fullscreen"
             >
               <View style={styles.videoContainer}>
@@ -288,10 +289,11 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
                   />
                 </Pressable>
               </View>
-            </Pressable>
+            </TouchableOpacity>
           ) : (
             <View style={styles.imageContainer}>
-              <Pressable
+              <TouchableOpacity
+                activeOpacity={0.8}
                 onPress={() => {
                   const vidUrl = post.secure_media?.reddit_video?.fallback_url
                     ?? post.preview?.reddit_video_preview?.fallback_url
@@ -304,14 +306,13 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
                   setViewerVisible(true);
                 }}
                 accessibilityLabel="View image fullscreen"
-                accessibilityRole="button"
               >
                 <Image
                   source={{ uri: previewImageUrl! }}
                   style={[styles.image, { aspectRatio: imageAspectRatio }]}
                   resizeMode="contain"
                 />
-              </Pressable>
+              </TouchableOpacity>
             </View>
           )}
           {renderFooter()}

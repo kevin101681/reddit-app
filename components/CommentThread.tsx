@@ -1,5 +1,5 @@
 ﻿import React, { memo, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Linking, Image, Modal } from 'react-native';
+import { View, Text, Pressable, TouchableOpacity, StyleSheet, Linking, Image, Modal } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { RedditComment } from '../utils/types';
 import { buildMarkdownStyles, suppressImageRule } from '../utils/markdownStyles';
@@ -128,21 +128,24 @@ export const CommentThread = memo(function CommentThread({
           {cleanBody}
         </Markdown>
 
-        {/* Inline Reddit images from the comment body */}
+        {/* Inline Reddit images from comment body (de-duped against media_metadata) */}
         {(() => {
           const imageRegex = /(https?:\/\/(?:preview\.redd\.it|i\.redd\.it)[^\s)]+)/g;
           const imageMatches = comment.body.match(imageRegex);
           if (!imageMatches) return null;
-          return imageMatches.map((rawUrl, i) => {
+          const metaUrls = new Set(
+            comment.media_metadata
+              ? Object.values(comment.media_metadata).filter(m => m.s && m.s.u).map(m => m.s!.u.replace(/&amp;/g, '&'))
+              : []
+          );
+          const unique = imageMatches.filter(rawUrl => !metaUrls.has(rawUrl.replace(/&amp;/g, '&')));
+          if (!unique.length) return null;
+          return unique.map((rawUrl, i) => {
             const url = rawUrl.replace(/&amp;/g, '&');
             return (
-              <Pressable key={i} onPress={() => setViewerUrl(url)} accessibilityRole="button" accessibilityLabel="View image fullscreen">
-                <Image
-                  source={{ uri: url }}
-                  style={styles.inlineImage}
-                  resizeMode="contain"
-                />
-              </Pressable>
+              <TouchableOpacity key={i} activeOpacity={0.8} onPress={() => setViewerUrl(url)} accessibilityLabel="View image fullscreen">
+                <Image source={{ uri: url }} style={styles.inlineImage} resizeMode="contain" />
+              </TouchableOpacity>
             );
           });
         })()}
@@ -153,13 +156,13 @@ export const CommentThread = memo(function CommentThread({
           .map((m, i) => {
             const url = m.s!.u.replace(/&amp;/g, '&');
             return (
-              <Pressable key={'mm-' + i} onPress={() => setViewerUrl(url)} accessibilityRole="button" accessibilityLabel="View image">
+              <TouchableOpacity key={'mm-' + i} activeOpacity={0.8} onPress={() => setViewerUrl(url)} accessibilityLabel="View image">
                 <Image
                   source={{ uri: url }}
                   style={{ width: '100%', height: 200, borderRadius: 12, marginTop: 8 }}
                   resizeMode="contain"
                 />
-              </Pressable>
+              </TouchableOpacity>
             );
           })
         }
