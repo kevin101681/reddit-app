@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react'; // layout
 import { Platform, UIManager } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -52,7 +52,7 @@ function RootStack() {
             gestureDirection: 'horizontal',
             animation: 'slide_from_right',
             presentation: 'card',
-            fullScreenGestureEnabled: true,
+            fullScreenGestureEnabled: false,
           }}
         />
       </Stack>

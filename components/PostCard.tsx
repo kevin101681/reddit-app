@@ -16,7 +16,7 @@ import { RedditPost } from "../utils/types";
 import { Colors, Spacing, Typography, Radius } from "../constants/theme";
 import { AppTheme, useTheme } from "../utils/ThemeContext";
 
-const BRAND = "#7ba0b3";
+const BRAND = "#7ba0b3"; // brand color
 const getTimeAgo = (timestamp: number): string => {
   if (!timestamp) return '';
   const seconds = Math.floor(Date.now() / 1000) - timestamp;
@@ -159,7 +159,12 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
         animationType="fade"
         onRequestClose={() => setViewerVisible(false)}
       >
-        <View style={styles.viewerOverlay}>
+        <Pressable
+          style={styles.viewerOverlay}
+          onPress={() => setViewerVisible(false)}
+          accessibilityLabel="Close viewer"
+          accessibilityRole="button"
+        >
           {viewerMedia.isVideo ? (
             <VideoView
               player={viewerPlayer}
@@ -174,22 +179,14 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
               resizeMode="contain"
             />
           )}
-          <Pressable
-            onPress={() => setViewerVisible(false)}
-            style={styles.viewerClose}
-            accessibilityLabel="Close viewer"
-            accessibilityRole="button"
-          >
-            <MaterialIcons name="close" size={28} color="#fff" />
-          </Pressable>
-        </View>
+        </Pressable>
       </Modal>
     );
   }
 
   function renderFooter() {
     return (
-      <View style={styles.footer}>
+      <TouchableOpacity style={styles.footer} activeOpacity={0.8} onPress={openPostDetail} accessibilityLabel="Open post" accessibilityRole="button">
         <View style={{ flex: 1 }}>
           <Text style={[styles.subreddit, { color: theme.brand }]} numberOfLines={1}>
             {post.subreddit_name_prefixed}
@@ -215,16 +212,10 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
           </Pressable>
         )}
 
-        <Pressable
-          onPress={openPostDetail}
-          hitSlop={10}
-          style={styles.footerBtn}
-          accessibilityLabel={"Open comments (" + post.num_comments + ")"}
-          accessibilityRole="button"
-        >
+        <View style={styles.footerBtn}>
           <MaterialIcons name="chat-bubble-outline" size={20} color={BRAND} />
-        </Pressable>
-      </View>
+        </View>
+      </TouchableOpacity>
     );
   }
 
@@ -263,9 +254,15 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => {
-                const url = videoUrl ?? "";
-                setViewerMedia({ url, isVideo: true });
-                setViewerVisible(true);
+                try {
+                  const url = videoUrl ?? post.secure_media?.reddit_video?.fallback_url ?? post.url ?? "";
+                  setViewerMedia({ url, isVideo: true });
+                  setViewerVisible(true);
+                } catch (e) {
+                  console.log("[PostCard] video open error:", e);
+                  setViewerMedia({ url: post.url ?? "", isVideo: false });
+                  setViewerVisible(true);
+                }
               }}
               accessibilityLabel="View fullscreen"
             >
@@ -295,15 +292,21 @@ function PostCardInner({ post, activePostId, viewMode = "standard", currentTheme
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => {
-                  const vidUrl = post.secure_media?.reddit_video?.fallback_url
-                    ?? post.preview?.reddit_video_preview?.fallback_url
-                    ?? null;
-                  const isGifOrVideo = !!vidUrl
-                    || /\.(mp4|gifv)(\?.*)?$/i.test(post.url ?? "");
-                  const finalUrl = vidUrl
-                    ?? (post.url ?? "").replace(/\.gifv(\?.*)?$/i, ".mp4");
-                  setViewerMedia({ url: isGifOrVideo ? finalUrl : previewImageUrl!, isVideo: isGifOrVideo });
-                  setViewerVisible(true);
+                  try {
+                    const vidUrl = post.secure_media?.reddit_video?.fallback_url
+                      ?? post.preview?.reddit_video_preview?.fallback_url
+                      ?? null;
+                    const isGifOrVideo = !!vidUrl
+                      || /\.(mp4|gifv)(\?.*)?$/i.test(post.url ?? "");
+                    const finalUrl = vidUrl
+                      ?? (post.url ?? "").replace(/\.gifv(\?.*)?$/i, ".mp4");
+                    setViewerMedia({ url: isGifOrVideo ? finalUrl : previewImageUrl!, isVideo: isGifOrVideo });
+                    setViewerVisible(true);
+                  } catch (e) {
+                    console.log("[PostCard] image open error:", e);
+                    setViewerMedia({ url: previewImageUrl ?? post.url ?? "", isVideo: false });
+                    setViewerVisible(true);
+                  }
                 }}
                 accessibilityLabel="View image fullscreen"
               >
